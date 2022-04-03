@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  mongo1:
+    container_name: mongo-1
+    image: mongo
+    command: ["--replSet", "rs0"]
+    ports:
+      - 50001:27017
+    volumes:
+      - mongo1_data:/data/db
+    healthcheck:
+      test: test $$( echo "rs.initiate({_id:'rs0',members:[{_id:0,host:'host.docker.internal:50001'},{_id:1,host:'host.docker.internal:50002'},{_id:2,host:'host.docker.internal:50003'}]}).ok || rs.status().ok" | mongo --port 27017 --quiet ) -eq 1
+      interval: 10s
+      start_period: 5s
+      retries: 5
+
+  mongo2:
+    container_name: mongo-2
+    image: mongo
+    command: ["--replSet", "rs0"]
+    ports:
+      - 50002:27017
+    volumes:
+      - mongo2_data:/data/db
+
+  mongo3:
+    container_name: mongo-3
+    image: mongo
+    command: ["--replSet", "rs0"]
+    ports:
+      - 50003:27017
+    volumes:
+      - mongo3_data:/data/db
+
+volumes:
+  mongo1_data:
+  mongo2_data:
+  mongo3_data:
