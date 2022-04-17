@@ -1,0 +1,15 @@
+[workspace]
+
+members = []
+
+[package]
+name = "mprobe"
+version = "0.1.0"
+authors = [ "Nelu Snegur <nelu@pulsarplanet.com>" ]
+edition = "2021"
+license = "Apache-2.0"
+repository = "https://github.com/nelusnegur/mprobe"
+readme = "README.md"
+
+[dependencies]
+clap = { version = "3.1.9", features = ["derive"] }
