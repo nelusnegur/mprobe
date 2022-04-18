@@ -1,0 +1,14 @@
+[package]
+name = "mprobe_lib"
+version = "0.1.0"
+edition = "2021"
+authors = [ "Nelu Snegur <nelu@pulsarplanet.com>" ]
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/nelusnegur/mprobe"
+include = [
+  "src/**/*",
+  "Cargo.toml",
+  "LICENSE-*",
+]
+
+[dependencies]
