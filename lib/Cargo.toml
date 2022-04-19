@@ -1,5 +1,5 @@
 [package]
-name = "mprobe_lib"
+name = "mprobe"
 version = "0.1.0"
 edition = "2021"
 authors = [ "Nelu Snegur <nelu@pulsarplanet.com>" ]
