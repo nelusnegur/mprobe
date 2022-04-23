@@ -6,6 +6,8 @@ use clap::Parser;
 use cli::Cli;
 use cli::Commands;
 
+use mprobe::diagnostics::DiagnosticData;
+
 fn main() {
     let cli = Cli::parse();
 
@@ -21,7 +23,13 @@ fn main() {
                 "mprobe scans diagnostic data from: `{}` and generates a visual representation in: `{}`",
                 path.display(),
                 output_path.display()
-            )
+            );
+
+            let dd = DiagnosticData::new(&path);
+            println!("{dd:?}");
+
+            let r = dd.scan();
+            println!("{r:?}");
         }
     }
 }
