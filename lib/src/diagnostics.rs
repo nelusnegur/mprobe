@@ -17,14 +17,14 @@ use crate::diagnostics::metrics::MetricsChunk;
 #[derive(Debug)]
 pub struct DiagnosticData<'a> {
     pub path: &'a Path,
-    dir_entries: ReadDir,
+    entries: ReadDir,
 }
 
 impl<'a> DiagnosticData<'a> {
     pub fn new(path: &'a Path) -> io::Result<Self> {
-        let dir_entries = fs::read_dir(path)?;
+        let entries = fs::read_dir(path)?;
 
-        Ok(DiagnosticData { path, dir_entries })
+        Ok(DiagnosticData { path, entries })
     }
 }
 
@@ -34,7 +34,7 @@ impl<'a> IntoIterator for DiagnosticData<'a> {
     type IntoIter = DiagnsticDataIter;
 
     fn into_iter(self) -> Self::IntoIter {
-        DiagnsticDataIter::new(self.dir_entries)
+        DiagnsticDataIter::new(self.entries)
     }
 }
 
