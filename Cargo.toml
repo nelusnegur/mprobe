@@ -9,13 +9,13 @@ name = "mprobe-cli"
 version = "0.1.0"
 authors = [ "Nelu Snegur <nelu@pulsarplanet.com>" ]
 edition = "2021"
-license = "MIT OR Apache-2.0"
+license = "MIT"
 repository = "https://github.com/nelusnegur/mprobe"
 readme = "README.md"
 include = [
   "src/**/*",
   "Cargo.toml",
-  "LICENSE-*",
+  "LICENSE",
   "README.md",
 ]
 
