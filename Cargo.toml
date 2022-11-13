@@ -20,5 +20,5 @@ include = [
 ]
 
 [dependencies]
-clap = { version = "3.1.9", features = ["derive"] }
 mprobe = { path = "./lib", version = "0.1.0" }
+clap = { version = "3.1.9", features = ["derive"] }

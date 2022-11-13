@@ -14,5 +14,4 @@ include = [
 [dependencies]
 chrono = "0.4.19"
 bson = "2.2.0"
-base64 = "0.13.0"
 flate2 = "1.0.23"
