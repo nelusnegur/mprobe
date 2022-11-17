@@ -7,11 +7,13 @@ use chrono::{DateTime, TimeZone, Utc};
 
 use crate::bytes;
 use crate::diagnostics::compression;
+use crate::diagnostics::metadata::Metadata;
 
 #[derive(Debug, Clone)]
 pub struct MetricsChunk {
     pub start_date: DateTime<Utc>,
     pub end_date: DateTime<Utc>,
+    pub metadata: Metadata,
     pub metrics: Vec<Metric>,
 }
 
@@ -44,7 +46,7 @@ impl MetricsChunk {
         let metrics = MetricsChunk::extract_metrics(&reference_doc, metrics_count)?;
         let metrics = MetricsChunk::read_samples(&mut cursor, metrics, samples_count)?;
 
-        MetricsChunk::from(metrics)
+        MetricsChunk::from(metrics, &reference_doc)
     }
 
     fn read_reference_doc<R: Read + ?Sized>(reader: &mut R) -> Result<Document> {
@@ -183,7 +185,7 @@ impl MetricsChunk {
         Ok(samples)
     }
 
-    fn from(metrics: Vec<(String, Vec<u64>)>) -> Result<MetricsChunk> {
+    fn from(metrics: Vec<(String, Vec<u64>)>, reference_doc: &Document) -> Result<MetricsChunk> {
         let mut start_timestamp_metrics: HashMap<&str, Vec<DateTime<Utc>>> = HashMap::new();
         let mut end_timestamp_metrics: HashMap<&str, Vec<DateTime<Utc>>> = HashMap::new();
 
@@ -297,10 +299,18 @@ impl MetricsChunk {
                 )
             })?;
 
+        let metadata = Metadata::from_reference_document(reference_doc).map_err(|e| {
+            Error::new(
+                ErrorKind::InvalidData,
+                format!("Could not parse metrics metadata. '{}'.", e),
+            )
+        })?;
+
         Ok(MetricsChunk {
             start_date: start_timestamp.to_owned(),
             end_date: end_timestamp.to_owned(),
             metrics: metric_chunks,
+            metadata,
         })
     }
 }

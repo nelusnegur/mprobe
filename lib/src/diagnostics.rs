@@ -1,4 +1,5 @@
 mod compression;
+mod metadata;
 mod metrics;
 
 use bson::Document;
@@ -38,15 +39,9 @@ impl<'a> IntoIterator for DiagnosticData<'a> {
     }
 }
 
-#[allow(dead_code)]
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
-enum DocumentType {
-    Metadata = 0,
-    MetricsChunk = 1,
-}
-
+const METRICS_CHUNK_DATA_TYPE: i32 = 1;
 const METRICS_CHUNK_FIELD_NAME: &str = "data";
-const DOCUMENT_TYPE_FIELD_NAME: &str = "type";
+const DATA_TYPE_FIELD_NAME: &str = "type";
 
 #[derive(Debug)]
 pub struct DiagnsticDataIter {
@@ -68,8 +63,8 @@ impl DiagnsticDataIter {
         loop {
             match Document::from_reader(&mut reader) {
                 Ok(document) => {
-                    if let Ok(doc_type) = document.get_i32(DOCUMENT_TYPE_FIELD_NAME) {
-                        if doc_type == DocumentType::MetricsChunk as i32 {
+                    if let Ok(data_type) = document.get_i32(DATA_TYPE_FIELD_NAME) {
+                        if data_type == METRICS_CHUNK_DATA_TYPE {
                             return match document.get_binary_generic(METRICS_CHUNK_FIELD_NAME) {
                                 Ok(data) => {
                                     let mut data = Cursor::new(data);
