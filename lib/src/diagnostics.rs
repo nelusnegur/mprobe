@@ -1,4 +1,5 @@
 mod compression;
+mod error;
 mod metadata;
 mod metrics;
 
@@ -13,6 +14,8 @@ use std::io::Cursor;
 use std::io::Read;
 use std::path::Path;
 
+use crate::diagnostics::error::MetricParserError;
+use crate::diagnostics::error::ValueAccessResultExt;
 use crate::diagnostics::metrics::MetricsChunk;
 
 #[derive(Debug)]
@@ -22,7 +25,7 @@ pub struct DiagnosticData<'a> {
 }
 
 impl<'a> DiagnosticData<'a> {
-    pub fn new(path: &'a Path) -> io::Result<Self> {
+    pub fn new(path: &'a Path) -> Result<Self, io::Error> {
         let entries = fs::read_dir(path)?;
 
         Ok(DiagnosticData { path, entries })
@@ -30,7 +33,7 @@ impl<'a> DiagnosticData<'a> {
 }
 
 impl<'a> IntoIterator for DiagnosticData<'a> {
-    type Item = io::Result<MetricsChunk>;
+    type Item = Result<MetricsChunk, MetricParserError>;
 
     type IntoIter = DiagnsticDataIter;
 
@@ -40,8 +43,8 @@ impl<'a> IntoIterator for DiagnosticData<'a> {
 }
 
 const METRICS_CHUNK_DATA_TYPE: i32 = 1;
-const METRICS_CHUNK_FIELD_NAME: &str = "data";
-const DATA_TYPE_FIELD_NAME: &str = "type";
+const METRICS_CHUNK_KEY: &str = "data";
+const DATA_TYPE_KEY: &str = "type";
 
 #[derive(Debug)]
 pub struct DiagnsticDataIter {
@@ -59,30 +62,36 @@ impl DiagnsticDataIter {
         }
     }
 
-    fn read_metrics_chunk<R: Read>(mut reader: R) -> Option<io::Result<MetricsChunk>> {
+    fn read_metrics_chunk<R: Read>(
+        mut reader: R,
+    ) -> Option<Result<MetricsChunk, MetricParserError>> {
         loop {
-            match Document::from_reader(&mut reader) {
+            match Document::from_reader(&mut reader).map_err(MetricParserError::from) {
                 Ok(document) => {
-                    if let Ok(data_type) = document.get_i32(DATA_TYPE_FIELD_NAME) {
+                    if let Ok(data_type) = document.get_i32(DATA_TYPE_KEY) {
                         if data_type == METRICS_CHUNK_DATA_TYPE {
-                            return match document.get_binary_generic(METRICS_CHUNK_FIELD_NAME) {
-                                Ok(data) => {
-                                    let mut data = Cursor::new(data);
-                                    Some(MetricsChunk::from_reader(&mut data))
-                                }
-                                Err(err) => {
-                                    Some(Err(io::Error::new(io::ErrorKind::InvalidData, err)))
-                                }
-                            };
+                            let chunk = DiagnsticDataIter::read_chunk(document);
+                            return Some(chunk);
                         }
                     }
                 }
-                Err(bson::de::Error::Io(err)) if err.kind() == io::ErrorKind::UnexpectedEof => {
+                Err(MetricParserError::BsonDeserialzation(bson::de::Error::Io(err)))
+                    if err.kind() == io::ErrorKind::UnexpectedEof =>
+                {
                     return None
                 }
-                Err(err) => return Some(Err(io::Error::new(io::ErrorKind::InvalidData, err))),
+                Err(err) => return Some(Err(err)),
             }
         }
+    }
+
+    fn read_chunk(document: Document) -> Result<MetricsChunk, MetricParserError> {
+        let data = document
+            .get_binary_generic(METRICS_CHUNK_KEY)
+            .map_value_access_err(METRICS_CHUNK_KEY)?;
+
+        let mut data = Cursor::new(data);
+        MetricsChunk::from_reader(&mut data)
     }
 
     fn file_predicate(entry: &io::Result<DirEntry>) -> bool {
@@ -98,7 +107,7 @@ impl DiagnsticDataIter {
 }
 
 impl Iterator for DiagnsticDataIter {
-    type Item = io::Result<MetricsChunk>;
+    type Item = Result<MetricsChunk, MetricParserError>;
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {
@@ -114,15 +123,17 @@ impl Iterator for DiagnsticDataIter {
 
             if let Some(files) = &mut self.files {
                 match files.find(DiagnsticDataIter::file_predicate) {
-                    Some(Ok(entry)) => match fs::File::open(entry.path()) {
-                        Ok(file) => {
-                            let buf_reader = BufReader::new(file);
-                            self.file_reader = Some(buf_reader);
-                            continue;
+                    Some(Ok(entry)) => {
+                        match fs::File::open(entry.path()).map_err(MetricParserError::from) {
+                            Ok(file) => {
+                                let buf_reader = BufReader::new(file);
+                                self.file_reader = Some(buf_reader);
+                                continue;
+                            }
+                            Err(err) => return Some(Err(err)),
                         }
-                        Err(err) => return Some(Err(err)),
-                    },
-                    Some(Err(err)) => return Some(Err(err)),
+                    }
+                    Some(Err(err)) => return Some(Err(MetricParserError::from(err))),
                     None => {
                         self.files = None;
                         continue;
@@ -134,6 +145,7 @@ impl Iterator for DiagnsticDataIter {
                 .dirs
                 .next()?
                 .and_then(|entry| fs::read_dir(entry.path()))
+                .map_err(MetricParserError::from)
             {
                 Ok(dir) => {
                     self.files = Some(dir);

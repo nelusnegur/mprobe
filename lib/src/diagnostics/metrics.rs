@@ -1,13 +1,24 @@
 use std::collections::HashMap;
-use std::io::{Cursor, Error, ErrorKind, Read, Result};
+use std::io;
+use std::io::{Cursor, Read};
 
+use bson::de;
 use bson::spec::ElementType;
 use bson::Document;
 use chrono::{DateTime, TimeZone, Utc};
 
 use crate::bytes;
 use crate::diagnostics::compression;
+use crate::diagnostics::error::MetricParserError;
 use crate::diagnostics::metadata::Metadata;
+
+const METRIC_PATH_SEPARATOR: char = '/';
+
+const START_TIMESTAMP_METRIC_NAME: &str = "start";
+const START_TIMESTAMP_METRIC_PATH: &str = "/start";
+
+const END_TIMESTAMP_METRIC_NAME: &str = "end";
+const END_TIMESTAMP_METRIC_PATH: &str = "/end";
 
 #[derive(Debug, Clone)]
 pub struct MetricsChunk {
@@ -32,41 +43,36 @@ pub struct Measurement {
 }
 
 impl MetricsChunk {
-    pub(crate) fn from_reader<R: Read + ?Sized>(reader: &mut R) -> Result<Self> {
+    pub fn from_reader<R: Read + ?Sized>(
+        reader: &mut R,
+    ) -> Result<MetricsChunk, MetricParserError> {
         let data = compression::decompress(reader)?;
         let mut cursor = Cursor::new(data.as_slice());
 
         let reference_doc = MetricsChunk::read_reference_doc(&mut cursor)?;
-        let metrics_count: usize = bytes::read_le_u32(&mut cursor)?
-            .try_into()
-            .map_err(|err| Error::new(ErrorKind::InvalidData, err))?;
-        let samples_count: usize = bytes::read_le_u32(&mut cursor)?
-            .try_into()
-            .map_err(|err| Error::new(ErrorKind::InvalidData, err))?;
+        let metrics_count: usize = bytes::read_le_u32(&mut cursor)?.try_into()?;
+        let samples_count: usize = bytes::read_le_u32(&mut cursor)?.try_into()?;
+
         let metrics = MetricsChunk::extract_metrics(&reference_doc, metrics_count)?;
         let metrics = MetricsChunk::read_samples(&mut cursor, metrics, samples_count)?;
 
         MetricsChunk::from(metrics, &reference_doc)
     }
 
-    fn read_reference_doc<R: Read + ?Sized>(reader: &mut R) -> Result<Document> {
-        Document::from_reader(reader).map_err(|err| Error::new(ErrorKind::InvalidData, err))
+    fn read_reference_doc<R: Read + ?Sized>(reader: &mut R) -> Result<Document, de::Error> {
+        Document::from_reader(reader)
     }
 
     fn extract_metrics(
         reference_doc: &Document,
         metrics_count: usize,
-    ) -> Result<Vec<(String, u64)>> {
+    ) -> Result<Vec<(String, u64)>, MetricParserError> {
         let mut metrics: Vec<(String, u64)> = Vec::with_capacity(metrics_count);
 
         MetricsChunk::select_metrics(reference_doc, "", &mut metrics);
 
         if metrics.len() != metrics_count {
-            return Err(Error::new(
-                ErrorKind::InvalidData,
-                "The metrics from the reference document and metrics count do not match."
-                    .to_string(),
-            ));
+            return Err(MetricParserError::MetricsCountMismatch);
         }
 
         Ok(metrics)
@@ -140,7 +146,7 @@ impl MetricsChunk {
         reader: &mut R,
         metrics: Vec<(String, u64)>,
         samples_count: usize,
-    ) -> Result<Vec<(String, Vec<u64>)>> {
+    ) -> Result<Vec<(String, Vec<u64>)>, io::Error> {
         if samples_count == 0 {
             return Ok(metrics.into_iter().map(|(m, v)| (m, vec![v])).collect());
         }
@@ -185,7 +191,10 @@ impl MetricsChunk {
         Ok(samples)
     }
 
-    fn from(metrics: Vec<(String, Vec<u64>)>, reference_doc: &Document) -> Result<MetricsChunk> {
+    fn from(
+        metrics: Vec<(String, Vec<u64>)>,
+        reference_doc: &Document,
+    ) -> Result<MetricsChunk, MetricParserError> {
         let mut start_timestamp_metrics: HashMap<&str, Vec<DateTime<Utc>>> = HashMap::new();
         let mut end_timestamp_metrics: HashMap<&str, Vec<DateTime<Utc>>> = HashMap::new();
 
@@ -218,12 +227,10 @@ impl MetricsChunk {
         });
 
         for (metric, values) in metrics_without_timestamps {
-            let collector = metric.split(METRIC_PATH_SEPARATOR).nth(1).ok_or_else(|| {
-                Error::new(
-                    ErrorKind::InvalidData,
-                    "The collector type could not be extracted from the metric name.".to_owned(),
-                )
-            })?;
+            let collector = metric
+                .split(METRIC_PATH_SEPARATOR)
+                .nth(1)
+                .ok_or(MetricParserError::MetricCollectorNotFound)?;
             let collector = metric_name("", collector);
 
             let start_metric_name = metric_name(&collector, START_TIMESTAMP_METRIC_NAME);
@@ -231,19 +238,13 @@ impl MetricsChunk {
 
             let start_timestamp_values = start_timestamp_metrics
                 .get(start_metric_name.as_str())
-                .ok_or_else(|| {
-                    Error::new(
-                        ErrorKind::InvalidInput,
-                        format!("'{}' metric could not be found.", start_metric_name),
-                    )
+                .ok_or_else(|| MetricParserError::MetricNotFound {
+                    name: start_metric_name.clone(),
                 })?;
             let end_timestamp_values = end_timestamp_metrics
                 .get(end_metric_name.as_str())
-                .ok_or_else(|| {
-                    Error::new(
-                        ErrorKind::InvalidInput,
-                        format!("'{}' metric could not be found.", end_metric_name),
-                    )
+                .ok_or_else(|| MetricParserError::MetricNotFound {
+                    name: end_metric_name.clone(),
                 })?;
 
             let measurements = start_timestamp_values
@@ -255,19 +256,19 @@ impl MetricsChunk {
                 })
                 .collect::<Vec<Measurement>>();
 
-            let start_date = start_timestamp_values.first().ok_or_else(|| {
-                Error::new(
-                    ErrorKind::InvalidData,
-                    format!("There are no values for '{}' metric.", start_metric_name),
-                )
-            })?;
+            let start_date =
+                start_timestamp_values
+                    .first()
+                    .ok_or(MetricParserError::MetricValueNotFound {
+                        name: start_metric_name,
+                    })?;
 
-            let end_date = end_timestamp_values.last().ok_or_else(|| {
-                Error::new(
-                    ErrorKind::InvalidData,
-                    format!("There are no values for '{}' metric.", end_metric_name),
-                )
-            })?;
+            let end_date =
+                end_timestamp_values
+                    .last()
+                    .ok_or(MetricParserError::MetricValueNotFound {
+                        name: end_metric_name,
+                    })?;
 
             metric_chunks.push(Metric {
                 name: metric.to_owned(),
@@ -280,31 +281,17 @@ impl MetricsChunk {
         let start_timestamp = start_timestamp_metrics
             .get(START_TIMESTAMP_METRIC_PATH)
             .and_then(|ts| ts.first())
-            .ok_or_else(|| {
-                Error::new(
-                    ErrorKind::InvalidData,
-                    format!(
-                        "'{}' metric could not be found.",
-                        START_TIMESTAMP_METRIC_PATH
-                    ),
-                )
+            .ok_or_else(|| MetricParserError::MetricNotFound {
+                name: START_TIMESTAMP_METRIC_PATH.to_owned(),
             })?;
         let end_timestamp = end_timestamp_metrics
             .get(END_TIMESTAMP_METRIC_PATH)
             .and_then(|ts| ts.last())
-            .ok_or_else(|| {
-                Error::new(
-                    ErrorKind::InvalidData,
-                    format!("'{}' metric could not be found.", END_TIMESTAMP_METRIC_PATH),
-                )
+            .ok_or_else(|| MetricParserError::MetricNotFound {
+                name: END_TIMESTAMP_METRIC_PATH.to_owned(),
             })?;
 
-        let metadata = Metadata::from_reference_document(reference_doc).map_err(|e| {
-            Error::new(
-                ErrorKind::InvalidData,
-                format!("Could not parse metrics metadata. '{}'.", e),
-            )
-        })?;
+        let metadata = Metadata::from_reference_document(reference_doc)?;
 
         Ok(MetricsChunk {
             start_date: start_timestamp.to_owned(),
@@ -314,14 +301,6 @@ impl MetricsChunk {
         })
     }
 }
-
-const METRIC_PATH_SEPARATOR: char = '/';
-
-const START_TIMESTAMP_METRIC_NAME: &str = "start";
-const START_TIMESTAMP_METRIC_PATH: &str = "/start";
-
-const END_TIMESTAMP_METRIC_NAME: &str = "end";
-const END_TIMESTAMP_METRIC_PATH: &str = "/end";
 
 fn metric_name(parent_key: &str, key: &str) -> String {
     format!("{}{}{}", parent_key, METRIC_PATH_SEPARATOR, key)

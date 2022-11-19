@@ -25,11 +25,12 @@ fn main() {
                 output_path.display()
             );
 
-            let dd = DiagnosticData::new(&path).expect("valid path");
-            println!("{dd:?}");
+            let diagnostic_data = DiagnosticData::new(&path).expect("valid path");
+            println!("{diagnostic_data:?}");
 
-            for metrics in dd.into_iter() {
+            for metrics in diagnostic_data {
                 let metrics = metrics.unwrap();
+                println!("{:?}", metrics.metadata);
 
                 for m in metrics.metrics {
                     println!("{0:?}", m.name);
