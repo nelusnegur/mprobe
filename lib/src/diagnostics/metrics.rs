@@ -43,7 +43,7 @@ pub struct Measurement {
 }
 
 impl MetricsChunk {
-    pub fn from_reader<R: Read + ?Sized>(
+    pub(in crate::diagnostics) fn from_reader<R: Read + ?Sized>(
         reader: &mut R,
     ) -> Result<MetricsChunk, MetricParserError> {
         let data = compression::decompress(reader)?;
