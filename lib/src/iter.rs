@@ -15,6 +15,8 @@ pub(crate) trait IteratorExt {
 impl<I: Iterator> IteratorExt for I {}
 
 /// An fallible iterator that filters elements of `iter` with `predicate`.
+///
+/// This `struct` is created by the [`IteratorExt::try_filter`] method on [`IteratorExt`].
 #[must_use = "iterators are lazy and do nothing unless consumed"]
 #[derive(Debug, Clone)]
 pub(crate) struct TryFilter<I, P> {
