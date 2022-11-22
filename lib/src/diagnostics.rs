@@ -11,7 +11,7 @@ use std::fs::ReadDir;
 use std::io;
 use std::path::Path;
 
-use crate::diagnostics::error::MetricParserError;
+use crate::diagnostics::error::MetricsDecoderError;
 use crate::diagnostics::metrics::MetricsChunk;
 use crate::diagnostics::read::MetricsIterator;
 
@@ -30,7 +30,7 @@ impl<'a> DiagnosticData<'a> {
 }
 
 impl<'a> IntoIterator for DiagnosticData<'a> {
-    type Item = Result<MetricsChunk, MetricParserError>;
+    type Item = Result<MetricsChunk, MetricsDecoderError>;
 
     type IntoIter = MetricsIterator;
 

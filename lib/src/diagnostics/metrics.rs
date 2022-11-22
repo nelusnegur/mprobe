@@ -9,7 +9,7 @@ use chrono::{DateTime, TimeZone, Utc};
 
 use crate::bytes;
 use crate::diagnostics::compression;
-use crate::diagnostics::error::MetricParserError;
+use crate::diagnostics::error::MetricsDecoderError;
 use crate::diagnostics::metadata::Metadata;
 
 const METRIC_PATH_SEPARATOR: char = '/';
@@ -45,7 +45,7 @@ pub struct Measurement {
 impl MetricsChunk {
     pub(in crate::diagnostics) fn from_reader<R: Read + ?Sized>(
         reader: &mut R,
-    ) -> Result<MetricsChunk, MetricParserError> {
+    ) -> Result<MetricsChunk, MetricsDecoderError> {
         let data = compression::decompress(reader)?;
         let mut cursor = Cursor::new(data.as_slice());
 
@@ -66,13 +66,13 @@ impl MetricsChunk {
     fn extract_metrics(
         reference_doc: &Document,
         metrics_count: usize,
-    ) -> Result<Vec<(String, u64)>, MetricParserError> {
+    ) -> Result<Vec<(String, u64)>, MetricsDecoderError> {
         let mut metrics: Vec<(String, u64)> = Vec::with_capacity(metrics_count);
 
         MetricsChunk::select_metrics(reference_doc, "", &mut metrics);
 
         if metrics.len() != metrics_count {
-            return Err(MetricParserError::MetricsCountMismatch);
+            return Err(MetricsDecoderError::MetricsCountMismatch);
         }
 
         Ok(metrics)
@@ -194,7 +194,7 @@ impl MetricsChunk {
     fn from(
         metrics: Vec<(String, Vec<u64>)>,
         reference_doc: &Document,
-    ) -> Result<MetricsChunk, MetricParserError> {
+    ) -> Result<MetricsChunk, MetricsDecoderError> {
         let mut start_timestamp_metrics: HashMap<&str, Vec<DateTime<Utc>>> = HashMap::new();
         let mut end_timestamp_metrics: HashMap<&str, Vec<DateTime<Utc>>> = HashMap::new();
 
@@ -230,7 +230,7 @@ impl MetricsChunk {
             let collector = metric
                 .split(METRIC_PATH_SEPARATOR)
                 .nth(1)
-                .ok_or(MetricParserError::MetricCollectorNotFound)?;
+                .ok_or(MetricsDecoderError::MetricCollectorNotFound)?;
             let collector = metric_name("", collector);
 
             let start_metric_name = metric_name(&collector, START_TIMESTAMP_METRIC_NAME);
@@ -238,12 +238,12 @@ impl MetricsChunk {
 
             let start_timestamp_values = start_timestamp_metrics
                 .get(start_metric_name.as_str())
-                .ok_or_else(|| MetricParserError::MetricNotFound {
+                .ok_or_else(|| MetricsDecoderError::MetricNotFound {
                     name: start_metric_name.clone(),
                 })?;
             let end_timestamp_values = end_timestamp_metrics
                 .get(end_metric_name.as_str())
-                .ok_or_else(|| MetricParserError::MetricNotFound {
+                .ok_or_else(|| MetricsDecoderError::MetricNotFound {
                     name: end_metric_name.clone(),
                 })?;
 
@@ -259,14 +259,14 @@ impl MetricsChunk {
             let start_date =
                 start_timestamp_values
                     .first()
-                    .ok_or(MetricParserError::MetricValueNotFound {
+                    .ok_or(MetricsDecoderError::MetricValueNotFound {
                         name: start_metric_name,
                     })?;
 
             let end_date =
                 end_timestamp_values
                     .last()
-                    .ok_or(MetricParserError::MetricValueNotFound {
+                    .ok_or(MetricsDecoderError::MetricValueNotFound {
                         name: end_metric_name,
                     })?;
 
@@ -281,13 +281,13 @@ impl MetricsChunk {
         let start_timestamp = start_timestamp_metrics
             .get(START_TIMESTAMP_METRIC_PATH)
             .and_then(|ts| ts.first())
-            .ok_or_else(|| MetricParserError::MetricNotFound {
+            .ok_or_else(|| MetricsDecoderError::MetricNotFound {
                 name: START_TIMESTAMP_METRIC_PATH.to_owned(),
             })?;
         let end_timestamp = end_timestamp_metrics
             .get(END_TIMESTAMP_METRIC_PATH)
             .and_then(|ts| ts.last())
-            .ok_or_else(|| MetricParserError::MetricNotFound {
+            .ok_or_else(|| MetricsDecoderError::MetricNotFound {
                 name: END_TIMESTAMP_METRIC_PATH.to_owned(),
             })?;
 

@@ -10,7 +10,7 @@ use std::io::Read;
 use bson::de;
 use bson::Document;
 
-use crate::diagnostics::error::MetricParserError;
+use crate::diagnostics::error::MetricsDecoderError;
 use crate::diagnostics::error::ValueAccessResultExt;
 use crate::diagnostics::filter;
 use crate::diagnostics::metrics::MetricsChunk;
@@ -18,7 +18,7 @@ use crate::iter::IteratorExt;
 
 type FileReader = MetricsDecoder<
     BsonReader<BufReader<File>>,
-    for<'d> fn(&'d Document) -> Result<bool, MetricParserError>,
+    for<'d> fn(&'d Document) -> Result<bool, MetricsDecoderError>,
 >;
 
 /// An iterator that decodes metrics from a [`std::fs::DirEntry`] and
@@ -41,7 +41,7 @@ impl MetricsIterator {
 }
 
 impl Iterator for MetricsIterator {
-    type Item = Result<MetricsChunk, MetricParserError>;
+    type Item = Result<MetricsChunk, MetricsDecoderError>;
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {
@@ -58,14 +58,17 @@ impl Iterator for MetricsIterator {
             if let Some(files) = &mut self.files {
                 match files.find(filter::file_predicate) {
                     Some(Ok(entry)) => {
-                        match File::open(entry.path()).map_err(MetricParserError::from) {
+                        match File::open(entry.path()).map_err(MetricsDecoderError::from) {
                             Ok(file) => {
                                 let buf_reader = BufReader::new(file);
                                 let file_reader = BsonReader::new(buf_reader);
                                 let metrics_decoder = MetricsDecoder::new(
                                     file_reader,
                                     filter::metrics_chunk
-                                        as for<'d> fn(&Document) -> Result<bool, MetricParserError>,
+                                        as for<'d> fn(
+                                            &Document,
+                                        )
+                                            -> Result<bool, MetricsDecoderError>,
                                 );
 
                                 self.file_reader = Some(metrics_decoder);
@@ -74,7 +77,7 @@ impl Iterator for MetricsIterator {
                             Err(err) => return Some(Err(err)),
                         }
                     }
-                    Some(Err(err)) => return Some(Err(MetricParserError::from(err))),
+                    Some(Err(err)) => return Some(Err(MetricsDecoderError::from(err))),
                     None => {
                         self.files = None;
                         continue;
@@ -86,7 +89,7 @@ impl Iterator for MetricsIterator {
                 .dirs
                 .next()?
                 .and_then(|entry| fs::read_dir(entry.path()))
-                .map_err(MetricParserError::from)
+                .map_err(MetricsDecoderError::from)
             {
                 Ok(dir) => {
                     self.files = Some(dir);
@@ -115,8 +118,8 @@ impl<I, P> MetricsDecoder<I, P> {
     }
 
     fn decode_metrics_chunk(
-        item: Result<Document, MetricParserError>,
-    ) -> Result<MetricsChunk, MetricParserError> {
+        item: Result<Document, MetricsDecoderError>,
+    ) -> Result<MetricsChunk, MetricsDecoderError> {
         match item {
             Ok(document) => {
                 let data = document
@@ -133,10 +136,10 @@ impl<I, P> MetricsDecoder<I, P> {
 
 impl<I, P> Iterator for MetricsDecoder<I, P>
 where
-    I: Iterator<Item = Result<Document, MetricParserError>>,
-    P: FnMut(&Document) -> Result<bool, MetricParserError>,
+    I: Iterator<Item = Result<Document, MetricsDecoderError>>,
+    P: FnMut(&Document) -> Result<bool, MetricsDecoderError>,
 {
-    type Item = Result<MetricsChunk, MetricParserError>;
+    type Item = Result<MetricsChunk, MetricsDecoderError>;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
@@ -161,14 +164,14 @@ impl<R> BsonReader<R> {
 }
 
 impl<R: Read> Iterator for BsonReader<R> {
-    type Item = Result<Document, MetricParserError>;
+    type Item = Result<Document, MetricsDecoderError>;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         match Document::from_reader(&mut self.reader) {
             Ok(document) => Some(Ok(document)),
             Err(de::Error::Io(err)) if err.kind() == io::ErrorKind::UnexpectedEof => None,
-            Err(error) => Some(Err(MetricParserError::from(error))),
+            Err(error) => Some(Err(MetricsDecoderError::from(error))),
         }
     }
 }

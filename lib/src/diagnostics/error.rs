@@ -10,12 +10,12 @@ use std::sync::Arc;
 use bson::de;
 use bson::document::ValueAccessError;
 
-/// The error type for parsing diagnostic metrics.
+/// The error type for decoding diagnostic metrics.
 ///
 /// Errors mostly originate from I/O read operations, BSON deserialization and field value accesses.
 #[derive(Debug, Clone)]
 #[non_exhaustive]
-pub enum MetricParserError {
+pub enum MetricsDecoderError {
     /// A [`std::io::Error`] encountered while reading metric chunks.
     Io(Arc<io::Error>),
 
@@ -45,61 +45,61 @@ pub enum MetricParserError {
     IntConversion(TryFromIntError),
 }
 
-impl Display for MetricParserError {
+impl Display for MetricsDecoderError {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match *self {
-            MetricParserError::Io(ref inner) => Display::fmt(inner, f),
-            MetricParserError::BsonDeserialzation(ref inner) => Display::fmt(inner, f),
-            MetricParserError::KeyValueAccess(ref inner) => Display::fmt(inner, f),
-            MetricParserError::MetricsCountMismatch => f.write_str(
+            MetricsDecoderError::Io(ref inner) => Display::fmt(inner, f),
+            MetricsDecoderError::BsonDeserialzation(ref inner) => Display::fmt(inner, f),
+            MetricsDecoderError::KeyValueAccess(ref inner) => Display::fmt(inner, f),
+            MetricsDecoderError::MetricsCountMismatch => f.write_str(
                 "metrics count from the reference document and metrics count from samples do not match"
             ),
-            MetricParserError::MetricCollectorNotFound => f.write_str(
+            MetricsDecoderError::MetricCollectorNotFound => f.write_str(
                 "collector type could not be extracted from the metric name"
             ),
-            MetricParserError::MetricNotFound { ref name } => write!(f, "\"{}\" metric not found", name),
-            MetricParserError::MetricValueNotFound { ref name } => write!(f, "there are no values for \"{}\" metric", name),
-            MetricParserError::IntConversion(ref inner) => Display::fmt(inner, f),
+            MetricsDecoderError::MetricNotFound { ref name } => write!(f, "\"{}\" metric not found", name),
+            MetricsDecoderError::MetricValueNotFound { ref name } => write!(f, "there are no values for \"{}\" metric", name),
+            MetricsDecoderError::IntConversion(ref inner) => Display::fmt(inner, f),
         }
     }
 }
 
-impl Error for MetricParserError {
+impl Error for MetricsDecoderError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
-            MetricParserError::Io(inner) => Some(inner),
-            MetricParserError::BsonDeserialzation(inner) => Some(inner),
-            MetricParserError::KeyValueAccess(inner) => Some(inner),
-            MetricParserError::MetricsCountMismatch => None,
-            MetricParserError::MetricCollectorNotFound => None,
-            MetricParserError::MetricNotFound { .. } => None,
-            MetricParserError::MetricValueNotFound { .. } => None,
-            MetricParserError::IntConversion(inner) => Some(inner),
+            MetricsDecoderError::Io(inner) => Some(inner),
+            MetricsDecoderError::BsonDeserialzation(inner) => Some(inner),
+            MetricsDecoderError::KeyValueAccess(inner) => Some(inner),
+            MetricsDecoderError::MetricsCountMismatch => None,
+            MetricsDecoderError::MetricCollectorNotFound => None,
+            MetricsDecoderError::MetricNotFound { .. } => None,
+            MetricsDecoderError::MetricValueNotFound { .. } => None,
+            MetricsDecoderError::IntConversion(inner) => Some(inner),
         }
     }
 }
 
-impl From<io::Error> for MetricParserError {
+impl From<io::Error> for MetricsDecoderError {
     fn from(error: io::Error) -> Self {
-        MetricParserError::Io(Arc::new(error))
+        MetricsDecoderError::Io(Arc::new(error))
     }
 }
 
-impl From<de::Error> for MetricParserError {
+impl From<de::Error> for MetricsDecoderError {
     fn from(error: de::Error) -> Self {
-        MetricParserError::BsonDeserialzation(error)
+        MetricsDecoderError::BsonDeserialzation(error)
     }
 }
 
-impl From<TryFromIntError> for MetricParserError {
+impl From<TryFromIntError> for MetricsDecoderError {
     fn from(error: TryFromIntError) -> Self {
-        MetricParserError::IntConversion(error)
+        MetricsDecoderError::IntConversion(error)
     }
 }
 
-impl From<KeyValueAccessError> for MetricParserError {
+impl From<KeyValueAccessError> for MetricsDecoderError {
     fn from(error: KeyValueAccessError) -> Self {
-        MetricParserError::KeyValueAccess(error)
+        MetricsDecoderError::KeyValueAccess(error)
     }
 }
 
