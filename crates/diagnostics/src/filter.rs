@@ -4,8 +4,8 @@ use std::path::Path;
 
 use bson::Document;
 
-use crate::diagnostics::error::MetricsDecoderError;
-use crate::diagnostics::error::ValueAccessResultExt;
+use crate::error::MetricsDecoderError;
+use crate::error::ValueAccessResultExt;
 
 const METRICS_CHUNK_DATA_TYPE: i32 = 1;
 const DATA_TYPE_KEY: &str = "type";

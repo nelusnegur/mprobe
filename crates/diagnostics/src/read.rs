@@ -10,11 +10,11 @@ use std::io::Read;
 use bson::de;
 use bson::Document;
 
-use crate::diagnostics::error::MetricsDecoderError;
-use crate::diagnostics::error::ValueAccessResultExt;
-use crate::diagnostics::filter;
-use crate::diagnostics::metrics::MetricsChunk;
+use crate::error::MetricsDecoderError;
+use crate::error::ValueAccessResultExt;
+use crate::filter;
 use crate::iter::IteratorExt;
+use crate::metrics::MetricsChunk;
 
 type FileReader = MetricsDecoder<
     BsonReader<BufReader<File>>,

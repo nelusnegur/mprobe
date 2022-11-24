@@ -1,10 +1,12 @@
 [package]
-name = "mprobe"
+name = "mprobe-diagnostics"
 version = "0.1.0"
 edition = "2021"
 authors = [ "Nelu Snegur <nelu@pulsarplanet.com>" ]
+keywords = [ "mongodb", "diagnostics", "ftdc", "metrics" ]
 license = "MIT"
-repository = "https://github.com/nelusnegur/mprobe"
+readme = "README.md"
+repository = "https://github.com/nelusnegur/mprobe/crates/diagnostics"
 include = [
   "src/**/*",
   "Cargo.toml",

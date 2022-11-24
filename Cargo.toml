@@ -1,7 +1,8 @@
 [workspace]
 
 members = [
-    "lib"
+    "crates/diagnostics",
+    "crates/mprobe"
 ]
 
 [package]
@@ -10,8 +11,10 @@ version = "0.1.0"
 authors = [ "Nelu Snegur <nelu@pulsarplanet.com>" ]
 edition = "2021"
 license = "MIT"
-repository = "https://github.com/nelusnegur/mprobe"
 readme = "README.md"
+repository = "https://github.com/nelusnegur/mprobe"
+keywords = [ "mongodb", "diagnostics", "ftdc" ]
+categories = ["command-line-utilities", "text-processing"]
 include = [
   "src/**/*",
   "Cargo.toml",
@@ -20,5 +23,5 @@ include = [
 ]
 
 [dependencies]
-mprobe = { path = "./lib", version = "0.1.0" }
+mprobe = { path = "./crates/mprobe", version = "0.1.0" }
 clap = { version = "3.1.9", features = ["derive"] }

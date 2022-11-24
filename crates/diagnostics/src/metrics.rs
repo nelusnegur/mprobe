@@ -8,9 +8,9 @@ use bson::Document;
 use chrono::{DateTime, TimeZone, Utc};
 
 use crate::bytes;
-use crate::diagnostics::compression;
-use crate::diagnostics::error::MetricsDecoderError;
-use crate::diagnostics::metadata::Metadata;
+use crate::compression;
+use crate::error::MetricsDecoderError;
+use crate::metadata::Metadata;
 
 const METRIC_PATH_SEPARATOR: char = '/';
 
@@ -43,7 +43,7 @@ pub struct Measurement {
 }
 
 impl MetricsChunk {
-    pub(in crate::diagnostics) fn from_reader<R: Read + ?Sized>(
+    pub(crate) fn from_reader<R: Read + ?Sized>(
         reader: &mut R,
     ) -> Result<MetricsChunk, MetricsDecoderError> {
         let data = compression::decompress(reader)?;

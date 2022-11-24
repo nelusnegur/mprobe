@@ -1,5 +1,7 @@
+mod bytes;
 mod compression;
 mod filter;
+mod iter;
 mod read;
 
 pub mod error;
@@ -11,9 +13,9 @@ use std::fs::ReadDir;
 use std::io;
 use std::path::Path;
 
-use crate::diagnostics::error::MetricsDecoderError;
-use crate::diagnostics::metrics::MetricsChunk;
-use crate::diagnostics::read::MetricsIterator;
+use crate::error::MetricsDecoderError;
+use crate::metrics::MetricsChunk;
+use crate::read::MetricsIterator;
 
 #[derive(Debug)]
 pub struct DiagnosticData<'a> {

@@ -1,7 +1,7 @@
 use bson::Document;
 
-use crate::diagnostics::error::KeyValueAccessError;
-use crate::diagnostics::error::ValueAccessResultExt;
+use crate::error::KeyValueAccessError;
+use crate::error::ValueAccessResultExt;
 
 const SERVER_STATUS_KEY: &str = "serverStatus";
 const HOST_KEY: &str = "host";
