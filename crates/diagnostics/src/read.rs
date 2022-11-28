@@ -1,11 +1,10 @@
-use std::fmt::Debug;
 use std::fs;
 use std::fs::File;
 use std::fs::ReadDir;
 use std::io;
-use std::io::BufReader;
 use std::io::Cursor;
 use std::io::Read;
+use std::path::PathBuf;
 
 use bson::de;
 use bson::Document;
@@ -16,86 +15,84 @@ use crate::filter;
 use crate::iter::IteratorExt;
 use crate::metrics::MetricsChunk;
 
-type FileReader = MetricsDecoder<
-    BsonReader<BufReader<File>>,
-    for<'d> fn(&'d Document) -> Result<bool, MetricsDecoderError>,
->;
-
-/// An iterator that decodes metrics from a [`std::fs::DirEntry`] and
-/// yields [`MetricsChunk`].
+/// An iterator that reads recursively diagnostic data files from a root directory
+/// identified by a [`std::fs::Path`], decodes metrics from BSON documents
+/// and yields [`MetricsChunk`] elements.
 #[must_use = "iterators are lazy and do nothing unless consumed"]
+#[derive(Debug)]
 pub struct MetricsIterator {
-    dirs: ReadDir,
-    files: Option<ReadDir>,
-    file_reader: Option<FileReader>,
+    traverse_dir: TraverseDir,
 }
 
 impl MetricsIterator {
-    pub fn new(dirs: ReadDir) -> Self {
-        Self {
-            dirs,
-            files: None,
-            file_reader: None,
-        }
+    pub(crate) fn new(root_dir: ReadDir) -> Self {
+        let traverse_dir = TraverseDir::new(root_dir);
+        Self { traverse_dir }
     }
 }
 
 impl Iterator for MetricsIterator {
     type Item = Result<MetricsChunk, MetricsDecoderError>;
 
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        (&mut self.traverse_dir)
+            .map(|item| {
+                item.and_then(File::open)
+                    .map(|file| {
+                        let bson_reader = BsonReader::new(file);
+                        MetricsDecoder::new(bson_reader, filter::metrics_chunk)
+                    })
+                    .map_err(MetricsDecoderError::from)
+            })
+            .try_flatten()
+            .next()
+    }
+}
+
+/// An iterator that traverses recursively a directory tree identified by
+/// a [`std::fs::Path`] and yields [`std::path::PathBuf`] for the contained files only.
+#[must_use = "iterators are lazy and do nothing unless consumed"]
+#[derive(Debug)]
+struct TraverseDir {
+    dirs: Vec<ReadDir>,
+}
+
+impl TraverseDir {
+    fn new(root_dir: ReadDir) -> Self {
+        let dirs = vec![root_dir];
+        Self { dirs }
+    }
+}
+
+impl Iterator for TraverseDir {
+    type Item = Result<PathBuf, io::Error>;
+
+    #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         loop {
-            if let Some(reader) = &mut self.file_reader {
-                match reader.next() {
-                    Some(metrics_chunk) => return Some(metrics_chunk),
-                    None => {
-                        self.file_reader = None;
-                        continue;
-                    }
-                }
-            }
+            let dir = self.dirs.last_mut()?;
 
-            if let Some(files) = &mut self.files {
-                match files.find(filter::file_predicate) {
-                    Some(Ok(entry)) => {
-                        match File::open(entry.path()).map_err(MetricsDecoderError::from) {
-                            Ok(file) => {
-                                let buf_reader = BufReader::new(file);
-                                let file_reader = BsonReader::new(buf_reader);
-                                let metrics_decoder = MetricsDecoder::new(
-                                    file_reader,
-                                    filter::metrics_chunk
-                                        as for<'d> fn(
-                                            &Document,
-                                        )
-                                            -> Result<bool, MetricsDecoderError>,
-                                );
-
-                                self.file_reader = Some(metrics_decoder);
-                                continue;
+            match dir.next() {
+                Some(Ok(entry)) => match entry.file_type() {
+                    Ok(file_type) => {
+                        if file_type.is_dir() {
+                            match fs::read_dir(entry.path()) {
+                                Ok(next_dir) => self.dirs.push(next_dir),
+                                Err(error) => return Some(Err(error)),
                             }
-                            Err(err) => return Some(Err(err)),
+                        } else if file_type.is_file() {
+                            return Some(Ok(entry.path()));
+                        } else {
+                            continue;
                         }
                     }
-                    Some(Err(err)) => return Some(Err(MetricsDecoderError::from(err))),
-                    None => {
-                        self.files = None;
-                        continue;
-                    }
+                    Err(error) => return Some(Err(error)),
+                },
+                Some(Err(error)) => return Some(Err(error)),
+                None => {
+                    self.dirs.pop();
                 }
-            }
-
-            match self
-                .dirs
-                .next()?
-                .and_then(|entry| fs::read_dir(entry.path()))
-                .map_err(MetricsDecoderError::from)
-            {
-                Ok(dir) => {
-                    self.files = Some(dir);
-                    continue;
-                }
-                Err(err) => return Some(Err(err)),
             }
         }
     }
@@ -117,6 +114,7 @@ impl<I, P> MetricsDecoder<I, P> {
         MetricsDecoder { iter, predicate }
     }
 
+    #[inline]
     fn decode_metrics_chunk(
         item: Result<Document, MetricsDecoderError>,
     ) -> Result<MetricsChunk, MetricsDecoderError> {
@@ -136,7 +134,7 @@ impl<I, P> MetricsDecoder<I, P> {
 
 impl<I, P> Iterator for MetricsDecoder<I, P>
 where
-    I: Iterator<Item = Result<Document, MetricsDecoderError>>,
+    I: Iterator<Item = Result<Document, de::Error>>,
     P: FnMut(&Document) -> Result<bool, MetricsDecoderError>,
 {
     type Item = Result<MetricsChunk, MetricsDecoderError>;
@@ -144,6 +142,7 @@ where
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         (&mut self.iter)
+            .map(|item| item.map_err(MetricsDecoderError::from))
             .try_filter(&mut self.predicate)
             .map(MetricsDecoder::<I, P>::decode_metrics_chunk)
             .next()
@@ -164,14 +163,14 @@ impl<R> BsonReader<R> {
 }
 
 impl<R: Read> Iterator for BsonReader<R> {
-    type Item = Result<Document, MetricsDecoderError>;
+    type Item = Result<Document, de::Error>;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         match Document::from_reader(&mut self.reader) {
             Ok(document) => Some(Ok(document)),
-            Err(de::Error::Io(err)) if err.kind() == io::ErrorKind::UnexpectedEof => None,
-            Err(error) => Some(Err(MetricsDecoderError::from(error))),
+            Err(de::Error::Io(error)) if error.kind() == io::ErrorKind::UnexpectedEof => None,
+            Err(error) => Some(Err(error)),
         }
     }
 }
