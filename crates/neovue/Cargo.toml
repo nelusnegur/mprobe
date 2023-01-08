@@ -1,0 +1,16 @@
+[package]
+name = "neuvue"
+version = "0.1.0"
+edition = "2021"
+authors = [ "Nelu Snegur <nelu@pulsarplanet.com>" ]
+keywords = [ "visualization", "charts"]
+license = "MIT"
+readme = "README.md"
+repository = "https://github.com/nelusnegur/mprobe/crates/neovue"
+include = [
+  "src/**/*",
+  "Cargo.toml",
+  "LICENSE",
+]
+
+[dependencies]

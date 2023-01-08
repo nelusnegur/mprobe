@@ -2,5 +2,6 @@
 members = [
     "crates/mprobe",
     "crates/diagnostics",
+    "crates/neovue",
     "crates/cli",
 ]
