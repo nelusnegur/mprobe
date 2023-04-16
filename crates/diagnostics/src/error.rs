@@ -47,19 +47,19 @@ pub enum MetricsDecoderError {
 
 impl Display for MetricsDecoderError {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        match *self {
-            MetricsDecoderError::Io(ref inner) => Display::fmt(inner, f),
-            MetricsDecoderError::BsonDeserialzation(ref inner) => Display::fmt(inner, f),
-            MetricsDecoderError::KeyValueAccess(ref inner) => Display::fmt(inner, f),
+        match self {
+            MetricsDecoderError::Io(inner) => Display::fmt(inner, f),
+            MetricsDecoderError::BsonDeserialzation(inner) => Display::fmt(inner, f),
+            MetricsDecoderError::KeyValueAccess(inner) => Display::fmt(inner, f),
             MetricsDecoderError::MetricsCountMismatch => f.write_str(
                 "metrics count from the reference document and metrics count from samples do not match"
             ),
             MetricsDecoderError::MetricCollectorNotFound => f.write_str(
                 "collector type could not be extracted from the metric name"
             ),
-            MetricsDecoderError::MetricNotFound { ref name } => write!(f, "\"{}\" metric not found", name),
-            MetricsDecoderError::MetricValueNotFound { ref name } => write!(f, "there are no values for \"{}\" metric", name),
-            MetricsDecoderError::IntConversion(ref inner) => Display::fmt(inner, f),
+            MetricsDecoderError::MetricNotFound { name } => write!(f, "\"{}\" metric not found", name),
+            MetricsDecoderError::MetricValueNotFound { name } => write!(f, "there are no values for \"{}\" metric", name),
+            MetricsDecoderError::IntConversion(inner) => Display::fmt(inner, f),
         }
     }
 }
