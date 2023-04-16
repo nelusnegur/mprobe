@@ -6,7 +6,13 @@ use clap::Parser;
 use cli::Cli;
 use cli::Commands;
 
-use mprobe::diagnostics::DiagnosticData;
+// use mprobe::diagnostics::DiagnosticData;
+use neovue::layout::Chart;
+use neovue::layout::ElementKind;
+use neovue::layout::Section;
+use neovue::layout::View;
+use neovue::render::output::OutputFile;
+use neovue::render::Render;
 
 fn main() {
     let cli = Cli::parse();
@@ -25,17 +31,24 @@ fn main() {
                 output_path.display()
             );
 
-            let diagnostic_data = DiagnosticData::new(&path).expect("valid path");
-            println!("{diagnostic_data:?}");
+            // let diagnostic_data = DiagnosticData::new(&path).expect("valid path");
+            // println!("{diagnostic_data:?}");
+            //
+            // for metrics in diagnostic_data {
+            //     let metrics = metrics.unwrap();
+            //     println!("{:?}", metrics.metadata);
+            //
+            //     for m in metrics.metrics {
+            //         println!("{0:?}", m.name);
+            //     }
+            // }
 
-            for metrics in diagnostic_data {
-                let metrics = metrics.unwrap();
-                println!("{:?}", metrics.metadata);
+            let view = View::new()
+                .add(ElementKind::Section(Section::new()))
+                .add(ElementKind::Chart(Chart::new()));
 
-                for m in metrics.metrics {
-                    println!("{0:?}", m.name);
-                }
-            }
+            let mut output = OutputFile::new(&output_path).unwrap();
+            view.render(&mut output).unwrap();
         }
     }
 }

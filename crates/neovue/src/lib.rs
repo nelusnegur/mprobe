@@ -1,2 +1,2 @@
-mod layout;
-mod render;
+pub mod layout;
+pub mod render;
