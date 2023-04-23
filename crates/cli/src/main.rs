@@ -7,7 +7,7 @@ use cli::Cli;
 use cli::Commands;
 
 // use mprobe::diagnostics::DiagnosticData;
-use neovue::layout::Chart;
+use neovue::layout::chart::Chart;
 use neovue::layout::ElementKind;
 use neovue::layout::Section;
 use neovue::layout::View;

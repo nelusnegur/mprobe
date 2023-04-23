@@ -1,5 +1,9 @@
+pub mod chart;
+
+use crate::layout::chart::Chart;
+
 pub trait Element {
-    fn id(&self) -> u64;
+    fn id(&self) -> &str;
 }
 
 #[derive(Debug)]
@@ -9,10 +13,10 @@ pub enum ElementKind {
 }
 
 impl Element for ElementKind {
-    fn id(&self) -> u64 {
+    fn id(&self) -> &str {
         match self {
-            ElementKind::Section(s) => s.id,
-            ElementKind::Chart(c) => c.id,
+            ElementKind::Section(s) => s.id(),
+            ElementKind::Chart(c) => c.id(),
         }
     }
 }
@@ -36,43 +40,22 @@ impl View {
 }
 
 #[derive(Debug)]
-pub struct Chart {
-    id: u64,
-    pub name: String,
-}
-
-impl Chart {
-    pub fn new() -> Chart {
-        Self {
-            id: 0,
-            name: String::new(),
-        }
-    }
-}
-
-impl Element for Chart {
-    fn id(&self) -> u64 {
-        self.id
-    }
-}
-
-#[derive(Debug)]
 pub struct Section {
-    id: u64,
+    id: String,
     pub elements: Vec<ElementKind>,
 }
 
 impl Section {
     pub fn new() -> Section {
         Self {
-            id: 0,
+            id: String::new(),
             elements: Vec::new(),
         }
     }
 }
 
 impl Element for Section {
-    fn id(&self) -> u64 {
-        self.id
+    fn id(&self) -> &str {
+        self.id.as_str()
     }
 }

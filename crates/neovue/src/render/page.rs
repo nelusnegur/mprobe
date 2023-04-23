@@ -1,4 +1,7 @@
-use crate::layout::Chart;
+use serde_json;
+
+use crate::layout::chart::Chart;
+use crate::layout::Element;
 use crate::layout::ElementKind;
 use crate::layout::Section;
 use crate::layout::View;
@@ -23,11 +26,15 @@ impl Render for View {
     where
         R: OutputStream,
     {
-        output.write("<html>")?;
-
-        output.write("<head>")?;
-        output.write("</head>")?;
-
+        output.write("<!DOCTYPE html>")?;
+        output.write(r#"<html lang="en">"#)?;
+        output.write(
+            r#"<head>
+                 <meta charset="utf-8" />
+                 <script src="https://cdn.plot.ly/plotly-2.20.0.min.js" charset="utf-8"></script>
+               </head>
+            "#,
+        )?;
         output.write("<body>")?;
 
         for element in &self.elements {
@@ -35,7 +42,6 @@ impl Render for View {
         }
 
         output.write("</body>")?;
-
         output.write("</html>")
     }
 }
@@ -60,7 +66,19 @@ impl Render for Chart {
     where
         R: OutputStream,
     {
-        // TODO: Render a chart
-        output.write("a chart should be here")
+        let id = self.id();
+        let config = serde_json::to_string(&self.spec)?;
+
+        output.write(&format!(
+            r#"
+                <div>
+                    <div id="{id}"></div>
+                    <script type="module">
+                        const chart = document.getElementById("{id}");
+                        await Plotly.newPlot(chart, {config});
+                    </script>
+                </div>
+            "#,
+        ))
     }
 }
