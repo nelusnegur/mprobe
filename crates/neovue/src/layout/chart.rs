@@ -1,10 +1,11 @@
 use serde::Serialize;
 
+use crate::layout::id::Id;
 use crate::layout::Element;
 
 #[derive(Serialize, Debug)]
 pub struct Chart {
-    id: String,
+    id: Id,
     pub name: String,
     pub spec: ChartSpec,
 }
@@ -12,7 +13,7 @@ pub struct Chart {
 impl Chart {
     pub fn new() -> Chart {
         Self {
-            id: String::from("chart"),
+            id: Id::next(),
             name: String::new(),
             spec: ChartSpec::default(),
         }
@@ -20,8 +21,8 @@ impl Chart {
 }
 
 impl Element for Chart {
-    fn id(&self) -> &str {
-        self.id.as_str()
+    fn id(&self) -> &Id {
+        &self.id
     }
 }
 

@@ -51,7 +51,8 @@ impl Render for Section {
     where
         R: OutputStream,
     {
-        output.write("<div>")?;
+        let id = self.id();
+        output.write(&format!(r#"<div id="{id}">"#))?;
 
         for element in &self.elements {
             element.render(output)?;
