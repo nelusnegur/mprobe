@@ -1,8 +1,12 @@
 pub mod chart;
+pub mod section;
+pub mod view;
+
 mod id;
 
 use crate::layout::chart::Chart;
 use crate::layout::id::Id;
+use crate::layout::section::Section;
 
 pub trait Element {
     fn id(&self) -> &Id;
@@ -20,44 +24,5 @@ impl Element for ElementKind {
             ElementKind::Section(s) => s.id(),
             ElementKind::Chart(c) => c.id(),
         }
-    }
-}
-
-#[derive(Debug)]
-pub struct View {
-    pub elements: Vec<ElementKind>,
-}
-
-impl View {
-    pub fn new() -> View {
-        View {
-            elements: Vec::new(),
-        }
-    }
-
-    pub fn add(mut self, element: ElementKind) -> View {
-        self.elements.push(element);
-        self
-    }
-}
-
-#[derive(Debug)]
-pub struct Section {
-    id: Id,
-    pub elements: Vec<ElementKind>,
-}
-
-impl Section {
-    pub fn new() -> Section {
-        Self {
-            id: Id::next(),
-            elements: Vec::new(),
-        }
-    }
-}
-
-impl Element for Section {
-    fn id(&self) -> &Id {
-        &self.id
     }
 }

@@ -1,10 +1,10 @@
 use serde_json;
 
 use crate::layout::chart::Chart;
+use crate::layout::section::Section;
+use crate::layout::view::View;
 use crate::layout::Element;
 use crate::layout::ElementKind;
-use crate::layout::Section;
-use crate::layout::View;
 use crate::render::error::RenderError;
 use crate::render::OutputStream;
 use crate::render::Render;

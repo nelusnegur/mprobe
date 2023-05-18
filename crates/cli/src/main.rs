@@ -3,16 +3,16 @@ mod cli;
 use std::env;
 
 use clap::Parser;
-use cli::Cli;
-use cli::Commands;
-
 // use mprobe::diagnostics::DiagnosticData;
 use neovue::layout::chart::Chart;
+use neovue::layout::section::Section;
+use neovue::layout::view::View;
 use neovue::layout::ElementKind;
-use neovue::layout::Section;
-use neovue::layout::View;
 use neovue::render::output::OutputFile;
 use neovue::render::Render;
+
+use crate::cli::Cli;
+use crate::cli::Commands;
 
 fn main() {
     let cli = Cli::parse();

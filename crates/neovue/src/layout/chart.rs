@@ -1,7 +1,7 @@
-use serde::Serialize;
-
 use crate::layout::id::Id;
 use crate::layout::Element;
+
+use serde::Serialize;
 
 #[derive(Serialize, Debug)]
 pub struct Chart {
@@ -17,6 +17,12 @@ impl Chart {
             name: String::new(),
             spec: ChartSpec::default(),
         }
+    }
+}
+
+impl Default for Chart {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
