@@ -68,15 +68,20 @@ impl Render for Chart {
         R: OutputStream,
     {
         let id = self.id();
-        let config = serde_json::to_string(&self.spec)?;
+        let trace = serde_json::to_string(&self.spec.trace)?;
+        let layout = serde_json::to_string(&self.spec.layout)?;
 
         output.write(&format!(
             r#"
                 <div>
                     <div id="{id}"></div>
-                    <script type="module">
+                    <script>
+                        let trace = {trace};
+                        trace.x = xs{id};
+                        trace.y = ys{id};
+
                         const chart = document.getElementById("{id}");
-                        await Plotly.newPlot(chart, {config});
+                        Plotly.newPlot(chart, [trace], {layout});
                     </script>
                 </div>
             "#,
