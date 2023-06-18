@@ -12,7 +12,7 @@ impl View {
         }
     }
 
-    pub fn add(mut self, element: ElementKind) -> View {
+    pub fn insert(mut self, element: ElementKind) -> View {
         self.elements.push(element);
         self
     }
