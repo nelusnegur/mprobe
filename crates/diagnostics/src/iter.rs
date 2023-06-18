@@ -94,12 +94,46 @@ where
     fn next(&mut self) -> Option<Self::Item> {
         loop {
             match self.inner_iter {
-                Some(ref mut inner_iter) => return inner_iter.next(),
+                Some(ref mut inner_iter) => match inner_iter.next() {
+                    None => self.inner_iter = None,
+                    item => return item,
+                },
                 None => match self.iter.next()? {
                     Ok(inner_iter) => self.inner_iter = Some(inner_iter),
                     Err(error) => return Some(Err(error)),
                 },
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn try_flatten_must_flatten_items() {
+        let expected: Vec<Result<u64, ()>> = vec![
+            Ok(1),
+            Ok(2),
+            Ok(3),
+            Ok(4),
+            Ok(5),
+            Ok(6),
+            Ok(7),
+            Ok(8),
+            Ok(9),
+        ];
+
+        let flattened: Vec<Result<u64, ()>> = vec![
+            Ok(vec![Ok(1), Ok(2), Ok(3)].into_iter()),
+            Ok(vec![Ok(4), Ok(5), Ok(6)].into_iter()),
+            Ok(vec![Ok(7), Ok(8), Ok(9)].into_iter()),
+        ]
+        .into_iter()
+        .try_flatten()
+        .collect();
+
+        assert_eq!(flattened, expected);
     }
 }
