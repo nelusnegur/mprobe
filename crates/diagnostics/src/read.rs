@@ -19,34 +19,67 @@ use crate::metrics::MetricsChunk;
 /// identified by a [`std::fs::Path`], decodes metrics from BSON documents
 /// and yields [`MetricsChunk`] elements.
 #[must_use = "iterators are lazy and do nothing unless consumed"]
-#[derive(Debug)]
+// #[derive(Debug)]
 pub struct MetricsIterator {
-    traverse_dir: TraverseDir,
+    metric_chunks: Box<dyn Iterator<Item = Result<MetricsChunk, MetricsDecoderError>>>,
 }
 
 impl MetricsIterator {
     pub(crate) fn new(root_dir: ReadDir) -> Self {
         let traverse_dir = TraverseDir::new(root_dir);
-        Self { traverse_dir }
+        let metrics_reader = Self::read_metrics(traverse_dir);
+        let metric_chunks = Box::new(metrics_reader);
+
+        Self { metric_chunks }
+    }
+
+    fn read_metrics<I>(iter: I) -> impl Iterator<Item = Result<MetricsChunk, MetricsDecoderError>>
+    where
+        I: Iterator<Item = Result<PathBuf, io::Error>>,
+    {
+        iter.map(|item| {
+            item.and_then(File::open)
+                .map(|file| Self::decode_metrics(BsonReader::new(file)))
+                .map_err(MetricsDecoderError::from)
+        })
+        .try_flatten()
+    }
+
+    fn decode_metrics<I>(iter: I) -> impl Iterator<Item = Result<MetricsChunk, MetricsDecoderError>>
+    where
+        I: Iterator<Item = Result<Document, de::Error>>,
+    {
+        iter.map(|item| item.map_err(MetricsDecoderError::from))
+            .try_filter(filter::metrics_chunk)
+            .map(Self::decode_metrics_chunk)
+    }
+
+    #[inline]
+    fn decode_metrics_chunk(
+        item: Result<Document, MetricsDecoderError>,
+    ) -> Result<MetricsChunk, MetricsDecoderError> {
+        match item {
+            Ok(document) => {
+                let data = document
+                    .get_binary_generic(METRICS_CHUNK_KEY)
+                    .map_value_access_err(METRICS_CHUNK_KEY)?;
+
+                let mut data = Cursor::new(data);
+                MetricsChunk::from_reader(&mut data)
+            }
+            Err(error) => Err(error),
+        }
     }
 }
+
+const METRICS_CHUNK_KEY: &str = "data";
 
 impl Iterator for MetricsIterator {
     type Item = Result<MetricsChunk, MetricsDecoderError>;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        (&mut self.traverse_dir)
-            .map(|item| {
-                item.and_then(File::open)
-                    .map(|file| {
-                        let bson_reader = BsonReader::new(file);
-                        MetricsDecoder::new(bson_reader, filter::metrics_chunk)
-                    })
-                    .map_err(MetricsDecoderError::from)
-            })
-            .try_flatten()
-            .next()
+        self.metric_chunks.next()
     }
 }
 
@@ -95,57 +128,6 @@ impl Iterator for TraverseDir {
                 }
             }
         }
-    }
-}
-
-const METRICS_CHUNK_KEY: &str = "data";
-
-/// An iterator that filters elements of `iter` with `predicate`, decodes
-/// metrics from BSON documents and yields [`MetricsChunk`].
-#[must_use = "iterators are lazy and do nothing unless consumed"]
-#[derive(Debug, Clone)]
-struct MetricsDecoder<I, P> {
-    iter: I,
-    predicate: P,
-}
-
-impl<I, P> MetricsDecoder<I, P> {
-    fn new(iter: I, predicate: P) -> MetricsDecoder<I, P> {
-        MetricsDecoder { iter, predicate }
-    }
-
-    #[inline]
-    fn decode_metrics_chunk(
-        item: Result<Document, MetricsDecoderError>,
-    ) -> Result<MetricsChunk, MetricsDecoderError> {
-        match item {
-            Ok(document) => {
-                let data = document
-                    .get_binary_generic(METRICS_CHUNK_KEY)
-                    .map_value_access_err(METRICS_CHUNK_KEY)?;
-
-                let mut data = Cursor::new(data);
-                MetricsChunk::from_reader(&mut data)
-            }
-            Err(error) => Err(error),
-        }
-    }
-}
-
-impl<I, P> Iterator for MetricsDecoder<I, P>
-where
-    I: Iterator<Item = Result<Document, de::Error>>,
-    P: FnMut(&Document) -> Result<bool, MetricsDecoderError>,
-{
-    type Item = Result<MetricsChunk, MetricsDecoderError>;
-
-    #[inline]
-    fn next(&mut self) -> Option<Self::Item> {
-        (&mut self.iter)
-            .map(|item| item.map_err(MetricsDecoderError::from))
-            .try_filter(&mut self.predicate)
-            .map(MetricsDecoder::<I, P>::decode_metrics_chunk)
-            .next()
     }
 }
 
