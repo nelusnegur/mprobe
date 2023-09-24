@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::fmt::Display;
 use std::io;
 use std::io::{Cursor, Read};
 
@@ -36,10 +37,59 @@ pub struct Metric {
     pub measurements: Vec<Measurement>,
 }
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
+#[derive(Debug, PartialEq, PartialOrd, Clone, Copy)]
 pub struct Measurement {
     pub timestamp: DateTime<Utc>,
-    pub value: u64,
+    pub value: MetricValue,
+}
+
+#[derive(Debug, PartialEq, PartialOrd, Clone, Copy)]
+pub enum MetricValue {
+    UInt32(u32),
+    Int32(i32),
+    Int64(i64),
+    Float64(f64),
+    Boolean(bool),
+    DateTime(DateTime<Utc>),
+}
+
+impl Display for MetricValue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            MetricValue::UInt32(n) => Display::fmt(n, f),
+            MetricValue::Int32(n) => Display::fmt(n, f),
+            MetricValue::Int64(n) => Display::fmt(n, f),
+            MetricValue::Float64(n) => Display::fmt(n, f),
+            MetricValue::Boolean(b) => Display::fmt(b, f),
+            MetricValue::DateTime(dt) => Display::fmt(dt, f),
+        }
+    }
+}
+
+#[repr(u8)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+enum ValueType {
+    U32,
+    I32,
+    I64,
+    F64,
+    Bool,
+    // TODO: Currently we use UTC time zone.
+    // Check if it's possible to extract the exact time zone.
+    DateTime,
+}
+
+impl ValueType {
+    fn convert(&self, value: u64) -> MetricValue {
+        match *self {
+            ValueType::U32 => MetricValue::UInt32(value as u32),
+            ValueType::I32 => MetricValue::Int32(value as i32),
+            ValueType::I64 => MetricValue::Int64(value as i64),
+            ValueType::F64 => MetricValue::Float64(value as f64),
+            ValueType::Bool => MetricValue::Boolean(value != 0),
+            ValueType::DateTime => MetricValue::DateTime(Utc.timestamp_millis(value as i64)),
+        }
+    }
 }
 
 impl MetricsChunk {
@@ -66,8 +116,8 @@ impl MetricsChunk {
     fn extract_metrics(
         reference_doc: &Document,
         metrics_count: usize,
-    ) -> Result<Vec<(String, u64)>, MetricsDecoderError> {
-        let mut metrics: Vec<(String, u64)> = Vec::with_capacity(metrics_count);
+    ) -> Result<Vec<(String, ValueType, u64)>, MetricsDecoderError> {
+        let mut metrics: Vec<(String, ValueType, u64)> = Vec::with_capacity(metrics_count);
 
         MetricsChunk::select_metrics(reference_doc, "", &mut metrics);
 
@@ -81,38 +131,54 @@ impl MetricsChunk {
     fn select_metrics(
         reference_doc: &Document,
         parent_key: &str,
-        metrics: &mut Vec<(String, u64)>,
+        metrics: &mut Vec<(String, ValueType, u64)>,
     ) {
         for (key, value) in reference_doc {
             match value.element_type() {
                 ElementType::Int32 => {
-                    metrics.push((metric_name(parent_key, key), value.as_i32().unwrap() as u64));
+                    metrics.push((
+                        metric_name(parent_key, key),
+                        ValueType::I32,
+                        value.as_i32().unwrap() as u64,
+                    ));
                 }
                 ElementType::Int64 => {
-                    metrics.push((metric_name(parent_key, key), value.as_i64().unwrap() as u64));
+                    metrics.push((
+                        metric_name(parent_key, key),
+                        ValueType::I64,
+                        value.as_i64().unwrap() as u64,
+                    ));
                 }
                 ElementType::Double => {
-                    metrics.push((metric_name(parent_key, key), value.as_f64().unwrap() as u64));
+                    metrics.push((
+                        metric_name(parent_key, key),
+                        ValueType::F64,
+                        value.as_f64().unwrap() as u64,
+                    ));
                 }
                 ElementType::Boolean => {
                     metrics.push((
                         metric_name(parent_key, key),
+                        ValueType::Bool,
                         value.as_bool().unwrap() as u64,
                     ));
                 }
                 ElementType::DateTime => {
                     metrics.push((
                         metric_name(parent_key, key),
+                        ValueType::DateTime,
                         value.as_datetime().unwrap().timestamp_millis() as u64,
                     ));
                 }
                 ElementType::Timestamp => {
                     metrics.push((
                         metric_name(parent_key, key) + "/time",
+                        ValueType::U32,
                         value.as_timestamp().unwrap().time as u64,
                     ));
                     metrics.push((
                         metric_name(parent_key, key) + "/increment",
+                        ValueType::U32,
                         value.as_timestamp().unwrap().increment as u64,
                     ));
                 }
@@ -144,11 +210,14 @@ impl MetricsChunk {
 
     fn read_samples<R: Read + ?Sized>(
         reader: &mut R,
-        metrics: Vec<(String, u64)>,
+        metrics: Vec<(String, ValueType, u64)>,
         samples_count: usize,
-    ) -> Result<Vec<(String, Vec<u64>)>, io::Error> {
+    ) -> Result<Vec<(String, ValueType, Vec<u64>)>, io::Error> {
         if samples_count == 0 {
-            return Ok(metrics.into_iter().map(|(m, v)| (m, vec![v])).collect());
+            return Ok(metrics
+                .into_iter()
+                .map(|(m, t, v)| (m, t, vec![v]))
+                .collect());
         }
 
         let metrics_count = metrics.len();
@@ -175,30 +244,30 @@ impl MetricsChunk {
 
         // Decode delta values
         for m in 0..metrics_count {
-            samples[m][0] = samples[m][0].wrapping_add(metrics[m].1);
+            samples[m][0] = samples[m][0].wrapping_add(metrics[m].2);
 
             for s in 1..samples_count {
                 samples[m][s] = samples[m][s].wrapping_add(samples[m][s - 1]);
             }
         }
 
-        let samples: Vec<(String, Vec<u64>)> = samples
+        let samples: Vec<(String, ValueType, Vec<u64>)> = samples
             .into_iter()
-            .zip(metrics.into_iter())
-            .map(|(s, m)| (m.0, s))
+            .zip(metrics)
+            .map(|(s, m)| (m.0, m.1, s))
             .collect();
 
         Ok(samples)
     }
 
     fn from(
-        metrics: Vec<(String, Vec<u64>)>,
+        metrics: Vec<(String, ValueType, Vec<u64>)>,
         reference_doc: &Document,
     ) -> Result<MetricsChunk, MetricsDecoderError> {
         let mut start_timestamp_metrics: HashMap<&str, Vec<DateTime<Utc>>> = HashMap::new();
         let mut end_timestamp_metrics: HashMap<&str, Vec<DateTime<Utc>>> = HashMap::new();
 
-        for (name, values) in metrics.iter() {
+        for (name, _, values) in metrics.iter() {
             if name.ends_with(START_TIMESTAMP_METRIC_PATH) {
                 start_timestamp_metrics.insert(
                     name,
@@ -222,11 +291,11 @@ impl MetricsChunk {
             metrics.len() - start_timestamp_metrics.len() - end_timestamp_metrics.len(),
         );
 
-        let metrics_without_timestamps = metrics.iter().filter(|(m, _)| {
+        let metrics_without_timestamps = metrics.iter().filter(|(m, _, _)| {
             !m.ends_with(START_TIMESTAMP_METRIC_PATH) && !m.ends_with(END_TIMESTAMP_METRIC_PATH)
         });
 
-        for (metric, values) in metrics_without_timestamps {
+        for (metric, ty, values) in metrics_without_timestamps {
             let collector = metric
                 .split(METRIC_PATH_SEPARATOR)
                 .nth(1)
@@ -252,7 +321,7 @@ impl MetricsChunk {
                 .zip(values)
                 .map(|(start, value)| Measurement {
                     timestamp: start.to_owned(),
-                    value: *value,
+                    value: ty.convert(*value),
                 })
                 .collect::<Vec<Measurement>>();
 
