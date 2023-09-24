@@ -3,13 +3,13 @@ mod cli;
 use std::env;
 
 use clap::Parser;
-// use mprobe::diagnostics::DiagnosticData;
-use neovue::layout::chart::Chart;
-use neovue::layout::section::Section;
-use neovue::layout::view::View;
-use neovue::layout::ElementKind;
-use neovue::render::output::OutputFile;
-use neovue::render::Render;
+use mprobe::diagnostics::DiagnosticData;
+// use neovue::layout::chart::Chart;
+// use neovue::layout::section::Section;
+// use neovue::layout::view::View;
+// use neovue::layout::ElementKind;
+// use neovue::render::output::OutputFile;
+// use neovue::render::Render;
 
 use crate::cli::Cli;
 use crate::cli::Commands;
@@ -31,24 +31,25 @@ fn main() {
                 output_path.display()
             );
 
-            // let diagnostic_data = DiagnosticData::new(&path).expect("valid path");
-            // println!("{diagnostic_data:?}");
-            //
-            // for metrics in diagnostic_data {
-            //     let metrics = metrics.unwrap();
-            //     println!("{:?}", metrics.metadata);
-            //
-            //     for m in metrics.metrics {
-            //         println!("{0:?}", m.name);
-            //     }
-            // }
+            let diagnostic_data = DiagnosticData::new(&path).expect("valid path");
+            println!("{diagnostic_data:?}");
 
-            let view = View::new()
-                .add(ElementKind::Section(Section::new()))
-                .add(ElementKind::Chart(Chart::new()));
+            for metrics in diagnostic_data {
+                let metrics = metrics.unwrap();
+                println!("{:?}", metrics.metadata);
 
-            let mut output = OutputFile::new(&output_path).unwrap();
-            view.render(&mut output).unwrap();
+                for m in metrics.metrics {
+                    println!("{0:?}", m.name);
+                }
+            }
+
+            //
+            // let view = View::new()
+            //     .add(ElementKind::Section(Section::new()))
+            //     .add(ElementKind::Chart(Chart::new()));
+            //
+            // let mut output = OutputFile::new(&output_path).unwrap();
+            // view.render(&mut output).unwrap();
         }
     }
 }
