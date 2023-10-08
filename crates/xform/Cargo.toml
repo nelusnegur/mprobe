@@ -1,0 +1,17 @@
+[package]
+name = "mprobe-xform"
+version = "0.1.0"
+edition = "2021"
+authors = [ "Nelu Snegur <nelu@pulsarplanet.com>" ]
+keywords = [ "mongodb", "ftdc", "transform" ]
+license = "MIT"
+readme = "README.md"
+repository = "https://github.com/nelusnegur/mprobe/crates/xform"
+include = [
+  "src/**/*",
+  "Cargo.toml",
+  "LICENSE",
+]
+
+[dependencies]
+mprobe = { version = "0.1.0", path = "../diagnostics", package = "mprobe-diagnostics" }

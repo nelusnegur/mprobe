@@ -2,6 +2,7 @@
 members = [
     "crates/mprobe",
     "crates/diagnostics",
+    "crates/xform",
     "crates/neovue",
     "crates/cli",
 ]
