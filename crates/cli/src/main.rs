@@ -1,16 +1,18 @@
 mod cli;
+mod aggregate;
 
 use std::env;
 
 use clap::Parser;
 use mprobe::diagnostics::DiagnosticData;
-// use neovue::layout::chart::Chart;
-// use neovue::layout::section::Section;
-// use neovue::layout::view::View;
-// use neovue::layout::ElementKind;
-// use neovue::render::output::OutputFile;
-// use neovue::render::Render;
+use mprobe::vis::layout::chart::Chart;
+use mprobe::vis::layout::section::Section;
+use mprobe::vis::layout::view::View;
+use mprobe::vis::layout::ElementKind;
+use mprobe::vis::render::output::OutputFile;
+use mprobe::vis::render::Render;
 
+use crate::aggregate::AggregateMetricsIter;
 use crate::cli::Cli;
 use crate::cli::Commands;
 
@@ -34,22 +36,26 @@ fn main() {
             let diagnostic_data = DiagnosticData::new(&path).expect("valid path");
             println!("{diagnostic_data:?}");
 
-            for metrics in diagnostic_data {
-                let metrics = metrics.unwrap();
-                println!("{:?}", metrics.metadata);
+            // for metrics in diagnostic_data {
+            //     let metrics_chunk = metrics.unwrap();
+            //
+            //     for m in metrics_chunk.metrics {
+            //         println!("{}", m.name)
+            //     }
+            // }
 
-                for m in metrics.metrics {
-                    println!("{0:?}", m.name);
-                }
+            let aggregator = AggregateMetricsIter::new(diagnostic_data.into_iter());
+            for item in aggregator {
+                println!("{:?}", item);
             }
 
-            //
-            // let view = View::new()
-            //     .add(ElementKind::Section(Section::new()))
-            //     .add(ElementKind::Chart(Chart::new()));
-            //
-            // let mut output = OutputFile::new(&output_path).unwrap();
-            // view.render(&mut output).unwrap();
+            let view = View::new()
+                .insert(ElementKind::Section(Section::new()))
+                .insert(ElementKind::Chart(Chart::new()))
+                .insert(ElementKind::Chart(Chart::new()));
+
+            let mut output = OutputFile::new(&output_path).unwrap();
+            view.render(&mut output).unwrap();
         }
     }
 }

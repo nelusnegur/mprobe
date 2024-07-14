@@ -1,3 +1,6 @@
+mod data;
+mod gen;
+
 use std::format;
 use std::io::Seek;
 use std::io::Write;
@@ -7,7 +10,7 @@ use crate::render::DataItem;
 const COMMON_RESERVED_BYTES: usize =
 26 /* static characters */ +
 8 /* spaces */ +
-40 /* 2 * 20 bytes for two usizes */ +
+32 /* 2 * 16 bytes for two usizes */ +
 1 /* new line */;
 
 pub struct ChartData<W> {
@@ -29,7 +32,8 @@ impl<W: Write + Seek> ChartData<W> {
 
     // TODO: Separate start from write and end
     pub fn start(&mut self) -> Result<(), std::io::Error> {
-        let total_reserved_bytes = COMMON_RESERVED_BYTES + self.xaxis_name.len() + self.xaxis_name.len();
+        let total_reserved_bytes =
+            COMMON_RESERVED_BYTES + self.xaxis_name.len() + self.xaxis_name.len();
         self.writer.write_all(&vec![0; total_reserved_bytes])?;
         self.writer.write_all(b"\n")
     }
@@ -68,8 +72,8 @@ impl<W: Write + Seek> ChartData<W> {
 
 #[cfg(test)]
 mod tests {
-    use std::io::Cursor;
     use super::*;
+    use std::io::Cursor;
 
     #[test]
     fn write_chart_data() -> Result<(), std::io::Error> {
@@ -81,7 +85,7 @@ mod tests {
         let ys = vec![1.0, 2.0, 3.0, 4.0, 5.0];
 
         let expected_output = b"let xs = new Array(5), ys = new Array(5);
-\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0
+\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0
 xs[1] = 1; ys[1] = 1;
 xs[2] = 2; ys[2] = 2;
 xs[3] = 3; ys[3] = 3;

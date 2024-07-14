@@ -15,3 +15,4 @@ include = [
 
 [dependencies]
 mprobe-diagnostics = { version = "0.1.0", path = "../diagnostics" }
+mprobe-vis = { version = "0.1.0", path = "../vis" }

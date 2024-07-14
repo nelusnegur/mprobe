@@ -41,6 +41,8 @@ impl Render for View {
             element.render(output)?;
         }
 
+        // TODO: Write all chart files here
+
         output.write("</body>")?;
         output.write("</html>")
     }

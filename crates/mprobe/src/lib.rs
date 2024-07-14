@@ -7,3 +7,4 @@
 #![deny(missing_docs)]
 
 pub extern crate mprobe_diagnostics as diagnostics;
+pub extern crate mprobe_vis as vis;

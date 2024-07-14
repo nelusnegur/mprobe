@@ -5,7 +5,7 @@ use std::path::Path;
 use crate::render::error::RenderError;
 use crate::render::OutputStream;
 
-const FILE_NAME: &str = "metrics.html";
+const FILE_NAME: &str = "index.html";
 
 pub struct OutputFile {
     file: File,

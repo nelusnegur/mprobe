@@ -15,17 +15,6 @@ pub trait Render {
         O: OutputStream;
 }
 
-pub trait ChartStream {
-    fn set<I>(&mut self, iter: I) -> Result<(), std::io::Error>
-    where
-        I: IntoIterator<Item = DataItem>;
-
-    fn chunks<I, C>(&mut self, chunks_iter: I) -> Result<(), std::io::Error>
-    where
-        C: Iterator<Item = DataItem>,
-        I: Iterator<Item = C>;
-}
-
 pub trait DataWriter {
     fn start(&mut self) -> Result<(), std::io::Error>;
     fn write(&mut self, data: DataItem) -> Result<(), std::io::Error>;

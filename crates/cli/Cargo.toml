@@ -17,5 +17,4 @@ include = [
 
 [dependencies]
 mprobe = { path = "../mprobe", version = "0.1.0" }
-neovue = { path = "../neovue", version = "0.1.0" }
 clap = { version = "3.1.9", features = ["derive"] }
