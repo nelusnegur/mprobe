@@ -6,3 +6,5 @@ members = [
     "crates/neovue",
     "crates/cli",
 ]
+
+resolver = "2"
