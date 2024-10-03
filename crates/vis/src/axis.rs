@@ -1,11 +1,6 @@
-mod data;
-mod gen;
-
 use std::format;
 use std::io::Seek;
 use std::io::Write;
-
-use crate::render::DataItem;
 
 const COMMON_RESERVED_BYTES: usize =
 26 /* static characters */ +
@@ -67,6 +62,24 @@ impl<W: Write + Seek> ChartData<W> {
         );
 
         self.writer.write_all(init_line.as_bytes())
+    }
+}
+
+pub trait DataWriter {
+    fn start(&mut self) -> Result<(), std::io::Error>;
+    fn write(&mut self, data: DataItem) -> Result<(), std::io::Error>;
+    fn end(self) -> Result<(), std::io::Error>;
+}
+
+#[derive(Debug)]
+pub struct DataItem {
+    x: f64,
+    y: f64,
+}
+
+impl DataItem {
+    pub fn new(x: f64, y: f64) -> DataItem {
+        Self { x, y }
     }
 }
 
