@@ -6,6 +6,7 @@ use std::env;
 use clap::Parser;
 use mprobe::diagnostics::DiagnosticData;
 use mprobe::vis::html;
+use mprobe::vis::html::DataVis;
 
 use crate::aggregate::AggregateMetricsIter;
 use crate::cli::Cli;
@@ -44,7 +45,8 @@ fn main() {
             //     println!("{:?}", item);
             // }
 
-            html::create_html_file(&output_path).unwrap();
+            let vis = DataVis::init(&output_path).expect("initializing data vis directory failed");
+            vis.generate_report().expect("generating vis report failed");
         }
     }
 }
