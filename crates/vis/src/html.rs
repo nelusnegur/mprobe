@@ -6,6 +6,7 @@ use serde::Serialize;
 use tinytemplate::TinyTemplate;
 
 use crate::chart::Chart;
+use crate::chart::Series;
 use crate::id::Id;
 
 const FILE_NAME: &str = "index.html";
@@ -33,9 +34,9 @@ struct Context {
 
 fn create_context() -> Context {
     let charts = vec![
-        Chart::new(Id::next(), String::from("xs1"), String::from("ys1")),
-        Chart::new(Id::next(), String::from("xs2"), String::from("ys2")),
-        Chart::new(Id::next(), String::from("xs3"), String::from("ys3")),
+        Chart::new(Id::next(), Series::new(String::from("xs1"), String::from("ys1"))),
+        Chart::new(Id::next(), Series::new(String::from("xs2"), String::from("ys2"))),
+        Chart::new(Id::next(), Series::new(String::from("xs3"), String::from("ys3"))),
     ];
 
     Context { charts }

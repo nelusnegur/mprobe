@@ -2,33 +2,34 @@ use std::format;
 use std::io::Seek;
 use std::io::Write;
 
+use crate::chart::Series;
+
 const COMMON_RESERVED_BYTES: usize =
 26 /* static characters */ +
 8 /* spaces */ +
 32 /* 2 * 16 bytes for two usizes */ +
 1 /* new line */;
 
-pub struct ChartData<W> {
+pub struct SeriesWriter<W> {
     writer: W,
     written_items: usize,
-    xaxis_name: String,
-    yaxis_name: String,
+    series: Series,
 }
 
-impl<W: Write + Seek> ChartData<W> {
-    pub fn new(writer: W, xaxis_name: String, yaxis_name: String) -> ChartData<W> {
+impl<W: Write + Seek> SeriesWriter<W> {
+    pub fn new(writer: W, series: Series) -> SeriesWriter<W> {
         Self {
             writer,
             written_items: 0,
-            xaxis_name,
-            yaxis_name,
+            series,
         }
     }
 
     // TODO: Separate start from write and end
     pub fn start(&mut self) -> Result<(), std::io::Error> {
         let total_reserved_bytes =
-            COMMON_RESERVED_BYTES + self.xaxis_name.len() + self.xaxis_name.len();
+            COMMON_RESERVED_BYTES + self.series.xs.len() + self.series.xs.len();
+
         self.writer.write_all(&vec![0; total_reserved_bytes])?;
         self.writer.write_all(b"\n")
     }
@@ -38,8 +39,8 @@ impl<W: Write + Seek> ChartData<W> {
 
         let line = format!(
             "{xs}[{next_idx}] = {x}; {ys}[{next_idx}] = {y};\n",
-            xs = self.xaxis_name,
-            ys = self.yaxis_name,
+            xs = self.series.xs,
+            ys = self.series.ys,
             x = data.x,
             y = data.y
         );
@@ -54,14 +55,14 @@ impl<W: Write + Seek> ChartData<W> {
         // TODO: Handle the error when rewind fails due to buffer flush
         self.writer.rewind()?;
 
-        let init_line = format!(
+        let first_line = format!(
             "let {xs} = new Array({size}), {ys} = new Array({size});\n",
-            xs = self.xaxis_name,
-            ys = self.yaxis_name,
+            xs = self.series.xs,
+            ys = self.series.ys,
             size = self.written_items
         );
 
-        self.writer.write_all(init_line.as_bytes())
+        self.writer.write_all(first_line.as_bytes())
     }
 }
 
@@ -92,7 +93,8 @@ mod tests {
     fn write_chart_data() -> Result<(), std::io::Error> {
         let buffer: Vec<u8> = Vec::new();
         let mut writer: Cursor<Vec<u8>> = Cursor::new(buffer);
-        let mut chart_data = ChartData::new(&mut writer, String::from("xs"), String::from("ys"));
+        let series = Series::new(String::from("xs"), String::from("ys"));
+        let mut series = SeriesWriter::new(&mut writer, series);
 
         let xs = vec![1.0, 2.0, 3.0, 4.0, 5.0];
         let ys = vec![1.0, 2.0, 3.0, 4.0, 5.0];
@@ -107,13 +109,13 @@ xs[5] = 5; ys[5] = 5;
 ";
         let expected_output = std::str::from_utf8(expected_output).unwrap();
 
-        chart_data.start()?;
+        series.start()?;
 
         for (x, y) in xs.into_iter().zip(ys) {
-            chart_data.write(DataItem::new(x, y))?;
+            series.write(DataItem::new(x, y))?;
         }
 
-        chart_data.end()?;
+        series.end()?;
 
         let buff = writer.into_inner();
         let content = std::str::from_utf8(&buff).unwrap();

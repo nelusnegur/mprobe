@@ -13,8 +13,8 @@
     <div id="{ chart.id }"></div>
     <script>
       let trace{ chart.id } = \{"type": "scatter", "mode": "lines", "fill": "tozeroy"};
-      trace{ chart.id }.x = { chart.xs };
-      trace{ chart.id }.y = { chart.ys };
+      trace{ chart.id }.x = { chart.series.xs };
+      trace{ chart.id }.y = { chart.series.ys };
 
       const chart{ chart.id } = document.getElementById("{ chart.id }");
       Plotly.newPlot(chart{ chart.id }, [trace{ chart.id }], chartConfig);
