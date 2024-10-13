@@ -7,7 +7,6 @@ use clap::Parser;
 use mprobe::diagnostics::DiagnosticData;
 use mprobe::vis::layout::VisLayout;
 
-use crate::aggregate::AggregateMetricsIter;
 use crate::cli::Cli;
 use crate::cli::Commands;
 
@@ -39,13 +38,8 @@ fn main() {
             //     }
             // }
 
-            let aggregator = AggregateMetricsIter::new(diagnostic_data.into_iter());
-            // for item in aggregator {
-            //     println!("{:?}", item);
-            // }
-
             let vis = VisLayout::init(&output_path).expect("initializing data vis directory failed");
-            vis.generate_report().expect("generating vis report failed");
+            vis.generate_report(diagnostic_data.into_iter()).expect("generating vis report failed");
         }
     }
 }

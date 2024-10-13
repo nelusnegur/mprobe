@@ -2,6 +2,9 @@ use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
 
+use mprobe_diagnostics::error::MetricsDecoderError;
+use mprobe_diagnostics::metrics::MetricsChunk;
+
 use crate::chart::Chart;
 use crate::chart::Series;
 use crate::id::Id;
@@ -18,9 +21,10 @@ const INDEX_FILE_NAME: &str = "index.html";
 /// ./vis/series/series1.js
 /// ./vis/series/series2.js
 /// ./vis/series/...
+/// ./vis/series/seriesN.js
 ///
 /// The __index__ file represents the entry point into the visualization.
-/// The __series__ directory contains the chart series. 
+/// The __series__ directory contains the chart series.
 pub struct VisLayout {
     root_path: PathBuf,
     index_file_path: PathBuf,
@@ -42,7 +46,10 @@ impl VisLayout {
         })
     }
 
-    pub fn generate_report(&self) -> Result<(), std::io::Error> {
+    pub fn generate_report<I>(&self, metrics: I) -> Result<(), std::io::Error>
+    where
+        I: Iterator<Item = Result<MetricsChunk, MetricsDecoderError>>,
+    {
         let template = Template::new(&self.index_file_path);
         let context = create_context();
 

@@ -1,7 +1,7 @@
 use mprobe::diagnostics::error::MetricsDecoderError;
 use mprobe::diagnostics::metrics::MetricValue;
 use mprobe::diagnostics::metrics::MetricsChunk;
-use mprobe::vis::axis::DataItem;
+use mprobe::vis::series::DataItem;
 
 pub(crate) struct AggregateMetricsIter<I> {
     metric_chunks: I,
