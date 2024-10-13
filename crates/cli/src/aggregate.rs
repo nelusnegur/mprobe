@@ -1,18 +1,17 @@
 use mprobe::diagnostics::error::MetricsDecoderError;
 use mprobe::diagnostics::metrics::MetricValue;
 use mprobe::diagnostics::metrics::MetricsChunk;
-use mprobe::vis::series::DataItem;
 
 pub(crate) struct AggregateMetricsIter<I> {
     metric_chunks: I,
-    metrics: Option<std::vec::IntoIter<DataItem>>,
+    metrics: Option<std::vec::IntoIter<(f64, f64)>>,
 }
 
 impl<I> Iterator for AggregateMetricsIter<I>
 where
     I: Iterator<Item = Result<MetricsChunk, MetricsDecoderError>>,
 {
-    type Item = DataItem;
+    type Item = (f64, f64);
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
@@ -33,8 +32,8 @@ where
                                 )
                             })
                             .flat_map(|m| m.measurements)
-                            .map(|m| DataItem::new(convert(m.value), m.timestamp.timestamp() as f64))
-                            .collect::<Vec<DataItem>>();
+                            .map(|m| (convert(m.value), m.timestamp.timestamp() as f64))
+                            .collect::<Vec<(f64, f64)>>();
 
                         self.metrics = Some(inner_iter.into_iter());
                     }
