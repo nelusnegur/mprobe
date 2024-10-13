@@ -39,7 +39,7 @@ fn main() {
             // }
 
             let vis = VisLayout::init(&output_path).expect("initializing data vis directory failed");
-            vis.generate_report(diagnostic_data.into_iter()).expect("generating vis report failed");
+            vis.generate_report(diagnostic_data).expect("generating vis report failed");
         }
     }
 }

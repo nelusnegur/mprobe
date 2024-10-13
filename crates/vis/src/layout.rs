@@ -5,12 +5,12 @@ use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
 
-use mprobe_diagnostics::error::MetricsDecoderError;
-use mprobe_diagnostics::metrics::MetricsChunk;
+use mprobe_diagnostics::DiagnosticData;
 
 use crate::chart::Chart;
 use crate::chart::Series;
 use crate::id::Id;
+use crate::layout::series::SeriesGenerator;
 use crate::template::Context;
 use crate::template::Template;
 
@@ -49,10 +49,10 @@ impl VisLayout {
         })
     }
 
-    pub fn generate_report<I>(&self, metrics: I) -> Result<(), std::io::Error>
-    where
-        I: Iterator<Item = Result<MetricsChunk, MetricsDecoderError>>,
-    {
+    pub fn generate_report(&self, diagnostic_data: DiagnosticData) -> Result<(), std::io::Error> {
+        let series_gen = SeriesGenerator::new(&self.series_path);
+        series_gen.write(diagnostic_data.into_iter())?;
+
         let template = Template::new(&self.index_file_path);
         let context = create_context();
 
