@@ -15,7 +15,7 @@ fn main() {
     let cli = Cli::parse();
 
     match cli.command {
-        Commands::Scan { path, output_path } => {
+        Commands::Visualize { path, output_path } => {
             let output_path = if let Some(out) = output_path {
                 out
             } else {

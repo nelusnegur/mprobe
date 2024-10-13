@@ -14,8 +14,8 @@ pub(crate) struct Cli {
 
 #[derive(Subcommand)]
 pub(crate) enum Commands {
-    /// Scan the diagnostic data and generate a visual representation of it.
-    Scan {
+    /// Visualize the diagnostic data and generate a visual representation of it.
+    Visualize {
         /// Specify the path from where to read the diagnostic data.
         /// The path must exist and it must point to a directory.
         #[clap(short, long, parse(try_from_os_str = parse_path))]
