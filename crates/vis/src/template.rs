@@ -16,20 +16,19 @@ impl<'a> Template<'a> {
         Self { path }
     }
 
+    // TODO: Remove the expect
     pub fn render(&self, context: &Context) -> Result<(), std::io::Error> {
         let mut template = TinyTemplate::new();
         template
             .add_template("index", include_str!("./template/index.html.tt"))
-            .unwrap();
+            .expect("Couldn't register the index.html template");
 
         let text = template.render("index", &context).expect("Couldn't render");
 
         let mut file = File::create(self.path)?;
 
-        file.write_all(text.as_bytes()).unwrap();
-        file.flush().unwrap();
-
-        Ok(())
+        file.write_all(text.as_bytes())?;
+        file.flush()
     }
 }
 

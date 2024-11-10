@@ -12,7 +12,7 @@ const COMMON_RESERVED_BYTES: usize =
 
 pub struct SeriesWriter<W> {
     writer: W,
-    written_items: usize,
+    index: usize,
     series: Series,
 }
 
@@ -20,12 +20,11 @@ impl<W: Write + Seek> SeriesWriter<W> {
     pub fn new(writer: W, series: Series) -> SeriesWriter<W> {
         Self {
             writer,
-            written_items: 0,
+            index: 0,
             series,
         }
     }
 
-    // TODO: Separate start from write and end
     pub fn start(&mut self) -> Result<(), std::io::Error> {
         let total_reserved_bytes =
             COMMON_RESERVED_BYTES + self.series.xs.len() + self.series.xs.len();
@@ -34,19 +33,18 @@ impl<W: Write + Seek> SeriesWriter<W> {
         self.writer.write_all(b"\n")
     }
 
-    pub fn write(&mut self, data: DataItem) -> Result<(), std::io::Error> {
-        let next_idx = self.written_items + 1;
-
+    pub fn write(&mut self, x: f64, y: f64) -> Result<(), std::io::Error> {
         let line = format!(
-            "{xs}[{next_idx}] = {x}; {ys}[{next_idx}] = {y};\n",
+            "{xs}[{idx}] = {x}; {ys}[{idx}] = {y};\n",
             xs = self.series.xs,
             ys = self.series.ys,
-            x = data.x,
-            y = data.y
+            idx = self.index,
+            x = x,
+            y = y
         );
 
         self.writer.write_all(line.as_bytes())?;
-        self.written_items += 1;
+        self.index += 1;
 
         Ok(())
     }
@@ -59,28 +57,10 @@ impl<W: Write + Seek> SeriesWriter<W> {
             "let {xs} = new Array({size}), {ys} = new Array({size});\n",
             xs = self.series.xs,
             ys = self.series.ys,
-            size = self.written_items
+            size = self.index
         );
 
         self.writer.write_all(first_line.as_bytes())
-    }
-}
-
-pub trait DataWriter {
-    fn start(&mut self) -> Result<(), std::io::Error>;
-    fn write(&mut self, data: DataItem) -> Result<(), std::io::Error>;
-    fn end(self) -> Result<(), std::io::Error>;
-}
-
-#[derive(Debug)]
-pub struct DataItem {
-    x: f64,
-    y: f64,
-}
-
-impl DataItem {
-    pub fn new(x: f64, y: f64) -> DataItem {
-        Self { x, y }
     }
 }
 
@@ -101,18 +81,18 @@ mod tests {
 
         let expected_output = b"let xs = new Array(5), ys = new Array(5);
 \0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0
-xs[1] = 1; ys[1] = 1;
-xs[2] = 2; ys[2] = 2;
-xs[3] = 3; ys[3] = 3;
-xs[4] = 4; ys[4] = 4;
-xs[5] = 5; ys[5] = 5;
+xs[0] = 1; ys[0] = 1;
+xs[1] = 2; ys[1] = 2;
+xs[2] = 3; ys[2] = 3;
+xs[3] = 4; ys[3] = 4;
+xs[4] = 5; ys[4] = 5;
 ";
         let expected_output = std::str::from_utf8(expected_output).unwrap();
 
         series.start()?;
 
         for (x, y) in xs.into_iter().zip(ys) {
-            series.write(DataItem::new(x, y))?;
+            series.write(x, y)?;
         }
 
         series.end()?;

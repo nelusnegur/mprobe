@@ -53,6 +53,19 @@ pub enum MetricValue {
     DateTime(DateTime<Utc>),
 }
 
+impl From<MetricValue> for f64 {
+    fn from(value: MetricValue) -> f64 {
+        match value {
+            MetricValue::UInt32(v) => v as f64,
+            MetricValue::Int32(v) => v as f64,
+            MetricValue::Int64(v) => v as f64,
+            MetricValue::Float64(v) => v,
+            MetricValue::Boolean(b) => b as u64 as f64,
+            MetricValue::DateTime(dt) => dt.timestamp_millis() as f64,
+        }
+    }
+}
+
 impl Display for MetricValue {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {

@@ -1,5 +1,4 @@
 mod cli;
-mod aggregate;
 
 use std::env;
 
