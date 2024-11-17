@@ -1,6 +1,7 @@
 use std::format;
 use std::io::Seek;
 use std::io::Write;
+use std::sync::Arc;
 
 use crate::chart::Series;
 
@@ -13,11 +14,11 @@ const COMMON_RESERVED_BYTES: usize =
 pub struct SeriesWriter<W> {
     writer: W,
     index: usize,
-    series: Series,
+    series: Arc<Series>,
 }
 
 impl<W: Write + Seek> SeriesWriter<W> {
-    pub fn new(writer: W, series: Series) -> SeriesWriter<W> {
+    pub fn new(writer: W, series: Arc<Series>) -> SeriesWriter<W> {
         Self {
             writer,
             index: 0,
@@ -28,8 +29,9 @@ impl<W: Write + Seek> SeriesWriter<W> {
     pub fn start(&mut self) -> Result<(), std::io::Error> {
         let total_reserved_bytes =
             COMMON_RESERVED_BYTES + self.series.xs.len() + self.series.xs.len();
+        let whitespaces = b" ".repeat(total_reserved_bytes);
 
-        self.writer.write_all(&vec![0; total_reserved_bytes])?;
+        self.writer.write_all(&whitespaces)?;
         self.writer.write_all(b"\n")
     }
 
@@ -73,14 +75,14 @@ mod tests {
     fn write_chart_data() -> Result<(), std::io::Error> {
         let buffer: Vec<u8> = Vec::new();
         let mut writer: Cursor<Vec<u8>> = Cursor::new(buffer);
-        let series = Series::new(String::from("xs"), String::from("ys"));
+        let series = Arc::new(Series::new(String::from("xs"), String::from("ys")));
         let mut series = SeriesWriter::new(&mut writer, series);
 
         let xs = vec![1.0, 2.0, 3.0, 4.0, 5.0];
         let ys = vec![1.0, 2.0, 3.0, 4.0, 5.0];
 
         let expected_output = b"let xs = new Array(5), ys = new Array(5);
-\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0
+                             
 xs[0] = 1; ys[0] = 1;
 xs[1] = 2; ys[1] = 2;
 xs[2] = 3; ys[2] = 3;
