@@ -9,29 +9,33 @@
 <body>
   <script>
     let chartConfig = \{
-        "xaxis": \{"type": "linear", "mirror": false, "showgrid": false, "showline": false, "zeroline": false, "autorange": true, "showticklabels": false},
-        "yaxis": \{"type": "linear", "mirror": false, "showgrid": false, "showline": false, "zeroline": false, "autorange": true, "showticklabels": false},
-        "width": 800,
-        "height": 400,
-        "showlegend": false,
-        "autosize": false,
-        "hovermode": "closest"
-      };
+      "xaxis": \{"type": "linear", "mirror": false, "showgrid": false, "showline": false, "zeroline": false, "autorange": true, "showticklabels": false},
+      "yaxis": \{"type": "linear", "mirror": false, "showgrid": false, "showline": false, "zeroline": false, "autorange": true, "showticklabels": false},
+      "width": 800,
+      "height": 400,
+      "showlegend": false,
+      "autosize": false,
+      "hovermode": "closest"
+    };
   </script>
 
   {{- for chart in charts }}
   <div>
-    <div id="{ chart.id }"></div>
-    <script src="{ chart.series_path }"> </script>
-    <script>
-      let trace{ chart.id } = \{"type": "scatter", "mode": "lines", "fill": "tozeroy"};
-      trace{ chart.id }.x = { chart.series.xs };
-      trace{ chart.id }.y = { chart.series.ys };
+    <details>
+      <summary>{ chart.name }</summary>
+      <div id="{ chart.id }"></div>
+      <script src="{ chart.series_path }"> </script>
+      <script>
+        let trace{chart.id} = \{"type": "scatter", "mode": "lines", "fill": "tozeroy"};
+        trace{chart.id}.x = {chart.series.xs};
+        trace{chart.id}.y = {chart.series.ys};
 
-      const chart{ chart.id } = document.getElementById("{ chart.id }");
-      Plotly.newPlot(chart{ chart.id }, [trace{ chart.id }], chartConfig);
-    </script>
+        const chart{chart.id} = document.getElementById("{ chart.id }");
+        Plotly.newPlot(chart{chart.id}, [trace{chart.id}], chartConfig);
+      </script>
+    </details>
   </div>
   {{- endfor }}
 </body>
+
 </html>
