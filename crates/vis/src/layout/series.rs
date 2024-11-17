@@ -1,26 +1,79 @@
+use std::collections::hash_map::Entry;
+use std::collections::HashMap;
 use std::fs;
+use std::fs::File;
+use std::fs::OpenOptions;
 use std::path::Path;
+use std::sync::Arc;
 
-use mprobe_diagnostics::error::MetricsDecoderError;
 use mprobe_diagnostics::metrics::MetricsChunk;
 
-pub struct SeriesGenerator<'a> {
+use crate::chart::Chart;
+use crate::chart::Series;
+use crate::id::Id;
+use crate::layout::writer::SeriesWriter;
+
+const SERIES_FILE_NAME: &str = "series";
+
+pub struct SeriesGen<'a> {
     path: &'a Path,
 }
 
-impl<'a> SeriesGenerator<'a> {
-    pub fn new(path: &'a Path) -> SeriesGenerator {
+impl<'a> SeriesGen<'a> {
+    pub fn new(path: &'a Path) -> SeriesGen {
         Self { path }
     }
 
-    pub fn write<I>(&self, metrics: I) -> Result<(), std::io::Error>
+    pub fn write<I>(&mut self, metrics: I) -> Result<Vec<Chart>, std::io::Error>
     where
-        I: Iterator<Item = Result<MetricsChunk, MetricsDecoderError>>,
+        I: Iterator<Item = MetricsChunk>,
     {
         if !self.path.exists() {
             fs::create_dir(self.path)?;
         }
 
-        todo!()
+        let mut writers: HashMap<String, SeriesWriter<File>> = HashMap::with_capacity(200);
+        let mut charts: Vec<Chart> = Vec::with_capacity(500);
+
+        for chunk in metrics {
+            for metric in chunk.metrics {
+                // TODO: Put the metric name behind the arc
+                let writer = match writers.entry(metric.name.clone()) {
+                    Entry::Occupied(entry) => entry.into_mut(),
+                    Entry::Vacant(vacant_entry) => {
+                        let id = Id::next();
+                        let file_name = format!("{SERIES_FILE_NAME}{id}.js");
+                        let file_path: Arc<Path> = Arc::from(self.path.join(file_name));
+                        let series = Arc::new(Series::from(id));
+                        let writer = OpenOptions::new()
+                            .create(true)
+                            .write(true)
+                            .truncate(false)
+                            .open(&file_path)?;
+
+                        let chart =
+                            Chart::new(id, metric.name.clone(), Arc::clone(&series), file_path);
+                        charts.push(chart);
+
+                        let mut writer = SeriesWriter::new(writer, Arc::clone(&series));
+                        writer.start()?;
+
+                        vacant_entry.insert(writer)
+                    }
+                };
+
+                for measurement in metric.measurements {
+                    let x = measurement.timestamp.timestamp() as f64;
+                    let y = measurement.value.into();
+                    writer.write(x, y)?;
+                }
+            }
+        }
+
+        for (_, writer) in writers {
+            writer.end()?;
+        }
+
+        Ok(charts)
     }
 }

@@ -16,7 +16,7 @@ include = [
 [dependencies]
 mprobe-diagnostics = { version = "0.1.0", path = "../diagnostics" }
 
-serde = { version = "1.0.160", features = [ "derive" ] }
+serde = { version = "1.0.160", features = [ "derive", "rc" ] }
 serde_json = "1.0.96"
 
 tinytemplate = "1.2.1"

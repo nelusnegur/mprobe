@@ -1,3 +1,6 @@
+use std::path::Path;
+use std::sync::Arc;
+
 use serde::Serialize;
 
 use crate::id::Id;
@@ -6,12 +9,18 @@ use crate::id::Id;
 pub struct Chart {
     id: Id,
     name: String,
-    series: Series,
+    series: Arc<Series>,
+    series_path: Arc<Path>,
 }
 
 impl Chart {
-    pub fn new(id: Id, name: String, series: Series) -> Chart {
-        Self { id, name, series }
+    pub fn new(id: Id, name: String, series: Arc<Series>, series_path: Arc<Path>) -> Chart {
+        Self {
+            id,
+            name,
+            series,
+            series_path,
+        }
     }
 }
 

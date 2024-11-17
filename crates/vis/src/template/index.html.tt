@@ -7,21 +7,6 @@
 </head>
 
 <body>
-
-  {{- for chart in charts }}
-  <div>
-    <div id="{ chart.id }"></div>
-    <script>
-      let trace{ chart.id } = \{"type": "scatter", "mode": "lines", "fill": "tozeroy"};
-      trace{ chart.id }.x = { chart.series.xs };
-      trace{ chart.id }.y = { chart.series.ys };
-
-      const chart{ chart.id } = document.getElementById("{ chart.id }");
-      Plotly.newPlot(chart{ chart.id }, [trace{ chart.id }], chartConfig);
-    </script>
-  </div>
-  {{- endfor }}
-
   <script>
     let chartConfig = \{
         "xaxis": \{"type": "linear", "mirror": false, "showgrid": false, "showline": false, "zeroline": false, "autorange": true, "showticklabels": false},
@@ -34,5 +19,19 @@
       };
   </script>
 
+  {{- for chart in charts }}
+  <div>
+    <div id="{ chart.id }"></div>
+    <script src="{ chart.series_path }"> </script>
+    <script>
+      let trace{ chart.id } = \{"type": "scatter", "mode": "lines", "fill": "tozeroy"};
+      trace{ chart.id }.x = { chart.series.xs };
+      trace{ chart.id }.y = { chart.series.ys };
+
+      const chart{ chart.id } = document.getElementById("{ chart.id }");
+      Plotly.newPlot(chart{ chart.id }, [trace{ chart.id }], chartConfig);
+    </script>
+  </div>
+  {{- endfor }}
 </body>
 </html>
