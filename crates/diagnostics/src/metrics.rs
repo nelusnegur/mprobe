@@ -100,7 +100,11 @@ impl ValueType {
             ValueType::I64 => MetricValue::Int64(value as i64),
             ValueType::F64 => MetricValue::Float64(value as f64),
             ValueType::Bool => MetricValue::Boolean(value != 0),
-            ValueType::DateTime => MetricValue::DateTime(Utc.timestamp_millis(value as i64)),
+            ValueType::DateTime => MetricValue::DateTime(
+                Utc.timestamp_millis_opt(value as i64)
+                    .single()
+                    .expect("timestamp to be converted to UTC"),
+            ),
         }
     }
 }
@@ -286,7 +290,11 @@ impl MetricsChunk {
                     name,
                     values
                         .iter()
-                        .map(|v| Utc.timestamp_millis(*v as i64))
+                        .map(|v| {
+                            Utc.timestamp_millis_opt(*v as i64)
+                                .single()
+                                .expect("timestamp to be converted to UTC")
+                        })
                         .collect(),
                 );
             } else if name.ends_with(END_TIMESTAMP_METRIC_PATH) {
@@ -294,7 +302,11 @@ impl MetricsChunk {
                     name,
                     values
                         .iter()
-                        .map(|v| Utc.timestamp_millis(*v as i64))
+                        .map(|v| {
+                            Utc.timestamp_millis_opt(*v as i64)
+                                .single()
+                                .expect("timestamp to be converted to UTC")
+                        })
                         .collect(),
                 );
             }
