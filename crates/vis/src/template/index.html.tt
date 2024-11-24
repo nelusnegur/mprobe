@@ -9,8 +9,8 @@
 <body>
   <script>
     let chartConfig = \{
-      "xaxis": \{"type": "linear", "mirror": false, "showgrid": false, "showline": false, "zeroline": false, "autorange": true, "showticklabels": false},
-      "yaxis": \{"type": "linear", "mirror": false, "showgrid": false, "showline": false, "zeroline": false, "autorange": true, "showticklabels": false},
+      "xaxis": \{"type": "date", "autorange": true },
+      "yaxis": \{"type": "linear", "autorange": true },
       "width": 800,
       "height": 400,
       "showlegend": false,
