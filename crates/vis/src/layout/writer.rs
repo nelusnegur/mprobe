@@ -43,7 +43,7 @@ impl<W: Write + Seek, X: Display, Y: Display> SeriesWriter<W, X, Y> {
 
     pub fn write(&mut self, x: X, y: Y) -> Result<(), std::io::Error> {
         let line = format!(
-            "{xs}[{idx}] = \"{x}\"; {ys}[{idx}] = {y};\n",
+            "{xs}[{idx}] = {x}; {ys}[{idx}] = {y};\n",
             xs = self.series.xs,
             ys = self.series.ys,
             idx = self.index,

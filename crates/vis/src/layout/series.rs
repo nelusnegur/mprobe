@@ -1,11 +1,14 @@
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
+use std::fmt::Display;
 use std::fs;
 use std::fs::File;
 use std::fs::OpenOptions;
 use std::path::Path;
 use std::sync::Arc;
 
+use chrono::DateTime;
+use chrono::Utc;
 use mprobe_diagnostics::metrics::MetricsChunk;
 
 use crate::chart::Chart;
@@ -32,7 +35,8 @@ impl<'a> SeriesGen<'a> {
             fs::create_dir(self.path)?;
         }
 
-        let mut writers: HashMap<String, SeriesWriter<File, String, f64>> = HashMap::with_capacity(200);
+        let mut writers: HashMap<String, SeriesWriter<File, Timestamp, f64>> =
+            HashMap::with_capacity(200);
         let mut charts: Vec<Chart> = Vec::with_capacity(500);
 
         for chunk in metrics {
@@ -63,7 +67,7 @@ impl<'a> SeriesGen<'a> {
                 };
 
                 for measurement in metric.measurements {
-                    let x = measurement.timestamp.to_rfc3339();
+                    let x = Timestamp(measurement.timestamp);
                     let y = measurement.value.into();
                     writer.write(x, y)?;
                 }
@@ -75,5 +79,13 @@ impl<'a> SeriesGen<'a> {
         }
 
         Ok(charts)
+    }
+}
+
+struct Timestamp(DateTime<Utc>);
+
+impl Display for Timestamp {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "\"{}\"", self.0.to_rfc3339())
     }
 }
