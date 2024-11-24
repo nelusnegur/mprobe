@@ -1,6 +1,8 @@
+use std::fmt::Display;
 use std::format;
 use std::io::Seek;
 use std::io::Write;
+use std::marker::PhantomData;
 use std::sync::Arc;
 
 use crate::chart::Series;
@@ -11,18 +13,22 @@ const COMMON_RESERVED_BYTES: usize =
 32 /* 2 * 16 bytes for two usizes */ +
 1 /* new line */;
 
-pub struct SeriesWriter<W> {
+pub struct SeriesWriter<W, X, Y> {
     writer: W,
     index: usize,
     series: Arc<Series>,
+    xtype: PhantomData<X>,
+    ytype: PhantomData<Y>,
 }
 
-impl<W: Write + Seek> SeriesWriter<W> {
-    pub fn new(writer: W, series: Arc<Series>) -> SeriesWriter<W> {
+impl<W: Write + Seek, X: Display, Y: Display> SeriesWriter<W, X, Y> {
+    pub fn new(writer: W, series: Arc<Series>) -> Self {
         Self {
             writer,
             index: 0,
             series,
+            xtype: PhantomData,
+            ytype: PhantomData,
         }
     }
 
@@ -35,9 +41,9 @@ impl<W: Write + Seek> SeriesWriter<W> {
         self.writer.write_all(b"\n")
     }
 
-    pub fn write(&mut self, x: f64, y: f64) -> Result<(), std::io::Error> {
+    pub fn write(&mut self, x: X, y: Y) -> Result<(), std::io::Error> {
         let line = format!(
-            "{xs}[{idx}] = {x}; {ys}[{idx}] = {y};\n",
+            "{xs}[{idx}] = \"{x}\"; {ys}[{idx}] = {y};\n",
             xs = self.series.xs,
             ys = self.series.ys,
             idx = self.index,

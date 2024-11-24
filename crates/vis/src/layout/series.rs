@@ -32,7 +32,7 @@ impl<'a> SeriesGen<'a> {
             fs::create_dir(self.path)?;
         }
 
-        let mut writers: HashMap<String, SeriesWriter<File>> = HashMap::with_capacity(200);
+        let mut writers: HashMap<String, SeriesWriter<File, String, f64>> = HashMap::with_capacity(200);
         let mut charts: Vec<Chart> = Vec::with_capacity(500);
 
         for chunk in metrics {
@@ -63,7 +63,7 @@ impl<'a> SeriesGen<'a> {
                 };
 
                 for measurement in metric.measurements {
-                    let x = measurement.timestamp.timestamp() as f64;
+                    let x = measurement.timestamp.to_rfc3339();
                     let y = measurement.value.into();
                     writer.write(x, y)?;
                 }
