@@ -37,7 +37,16 @@ impl MetricsIterator {
     where
         I: Iterator<Item = Result<PathBuf, io::Error>>,
     {
-        iter.map(|item| {
+        // TODO: Process the .interim file last
+        // For now just skip it.
+        iter.filter(|item| {
+            if let Ok(path) = item {
+                !path.extension().is_some_and(|e| e == "interim")
+            } else {
+                true
+            }
+        })
+        .map(|item| {
             item.and_then(File::open)
                 .map(|file| Self::decode_metrics(BsonReader::new(file)))
                 .map_err(MetricsDecoderError::from)
