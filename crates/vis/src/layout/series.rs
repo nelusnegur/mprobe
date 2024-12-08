@@ -23,7 +23,7 @@ pub struct SeriesGen<'a> {
 }
 
 impl<'a> SeriesGen<'a> {
-    pub fn new(path: &'a Path) -> SeriesGen {
+    pub fn new(path: &'a Path) -> SeriesGen<'a> {
         Self { path }
     }
 

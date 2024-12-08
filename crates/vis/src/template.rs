@@ -12,7 +12,7 @@ pub struct Template<'a> {
 }
 
 impl<'a> Template<'a> {
-    pub fn new(path: &'a Path) -> Template {
+    pub fn new(path: &'a Path) -> Template<'a> {
         Self { path }
     }
 

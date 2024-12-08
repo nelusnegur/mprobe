@@ -3,15 +3,20 @@ use std::fs::File;
 use std::fs::ReadDir;
 use std::io;
 use std::io::Cursor;
+use std::io::ErrorKind;
 use std::io::Read;
 use std::path::PathBuf;
+use std::rc::Rc;
 
 use bson::de;
 use bson::Document;
+use chrono::DateTime;
+use chrono::Utc;
 
 use crate::error::MetricsDecoderError;
 use crate::error::ValueAccessResultExt;
 use crate::filter;
+use crate::filter::MetricsFilter;
 use crate::iter::IteratorExt;
 use crate::metrics::MetricsChunk;
 
@@ -19,46 +24,60 @@ use crate::metrics::MetricsChunk;
 /// identified by a [`std::fs::Path`], decodes metrics from BSON documents
 /// and yields [`MetricsChunk`] elements.
 #[must_use = "iterators are lazy and do nothing unless consumed"]
-// #[derive(Debug)]
 pub struct MetricsIterator {
     metric_chunks: Box<dyn Iterator<Item = Result<MetricsChunk, MetricsDecoderError>>>,
 }
 
 impl MetricsIterator {
-    pub(crate) fn new(root_dir: ReadDir) -> Self {
+    pub(crate) fn new(root_dir: ReadDir, filter: MetricsFilter) -> Self {
+        let filter = Rc::new(filter);
         let traverse_dir = TraverseDir::new(root_dir);
-        let metrics_reader = Self::read_metrics(traverse_dir);
+        let path_sorter = PathSorter::new(traverse_dir);
+        let path_filter = Self::filter_path(path_sorter, filter.clone());
+
+        let metrics_reader = Self::read_metrics(path_filter, filter.clone());
         let metric_chunks = Box::new(metrics_reader);
 
         Self { metric_chunks }
     }
 
-    fn read_metrics<I>(iter: I) -> impl Iterator<Item = Result<MetricsChunk, MetricsDecoderError>>
+    fn filter_path<I>(
+        iter: I,
+        filter: Rc<MetricsFilter>,
+    ) -> impl Iterator<Item = Result<FileInfo, io::Error>>
     where
-        I: Iterator<Item = Result<PathBuf, io::Error>>,
+        I: Iterator<Item = Result<FileInfo, io::Error>>,
     {
-        // TODO: Process the .interim file last
-        // For now just skip it.
-        iter.filter(|item| {
-            if let Ok(path) = item {
-                !path.extension().is_some_and(|e| e == "interim")
-            } else {
-                true
-            }
+        iter.filter(move |item| match item {
+            Ok(fi) => filter.by_timestamp(fi.timestamp),
+            Err(_) => true,
         })
-        .map(|item| {
-            item.and_then(File::open)
-                .map(|file| Self::decode_metrics(BsonReader::new(file)))
+    }
+
+    fn read_metrics<I>(
+        iter: I,
+        filter: Rc<MetricsFilter>,
+    ) -> impl Iterator<Item = Result<MetricsChunk, MetricsDecoderError>>
+    where
+        I: Iterator<Item = Result<FileInfo, io::Error>>,
+    {
+        iter.map(move |item| {
+            item.and_then(|f| File::open(f.path))
+                .map(|file| Self::decode_metrics(BsonReader::new(file), filter.clone()))
                 .map_err(MetricsDecoderError::from)
         })
         .try_flatten()
     }
 
-    fn decode_metrics<I>(iter: I) -> impl Iterator<Item = Result<MetricsChunk, MetricsDecoderError>>
+    fn decode_metrics<I>(
+        iter: I,
+        filter: Rc<MetricsFilter>,
+    ) -> impl Iterator<Item = Result<MetricsChunk, MetricsDecoderError>>
     where
         I: Iterator<Item = Result<Document, de::Error>>,
     {
         iter.map(|item| item.map_err(MetricsDecoderError::from))
+            .try_filter(move |d| filter::timestamp(d, &filter))
             .try_filter(filter::metrics_chunk)
             .map(Self::decode_metrics_chunk)
     }
@@ -108,7 +127,7 @@ impl TraverseDir {
 }
 
 impl Iterator for TraverseDir {
-    type Item = Result<PathBuf, io::Error>;
+    type Item = Result<FileInfo, io::Error>;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
@@ -124,7 +143,15 @@ impl Iterator for TraverseDir {
                                 Err(error) => return Some(Err(error)),
                             }
                         } else if file_type.is_file() {
-                            return Some(Ok(entry.path()));
+                            // TODO: Process the .interim file last
+                            // For now just skip it.
+                            let path = entry.path();
+                            if path.extension().is_none_or(|e| e == "interim") {
+                                continue;
+                            }
+
+                            let file_info = FileInfo::from(path);
+                            return Some(file_info);
                         } else {
                             continue;
                         }
@@ -135,6 +162,87 @@ impl Iterator for TraverseDir {
                 None => {
                     self.dirs.pop();
                 }
+            }
+        }
+    }
+}
+
+struct FileInfo {
+    path: PathBuf,
+    timestamp: DateTime<Utc>,
+}
+
+impl FileInfo {
+    pub fn from(path: PathBuf) -> Result<FileInfo, io::Error> {
+        let timestamp = match path.extension() {
+            Some(ext) => {
+                let ext = ext.to_str().ok_or_else(|| {
+                    io::Error::new(
+                        ErrorKind::InvalidData,
+                        format!("the '{ext:?}' file extension is not a valid UTF-8"),
+                    )
+                })?;
+
+                DateTime::parse_from_rfc3339(ext)
+                    .map_err(|e| io::Error::new(ErrorKind::Other, e))?
+                    .with_timezone(&Utc)
+            }
+            None => {
+                return Err(io::Error::new(
+                    ErrorKind::InvalidData,
+                    format!("the '{path:?}' path does not have a file extension"),
+                ))
+            }
+        };
+
+        Ok(Self { path, timestamp })
+    }
+}
+
+/// An iterator that traverses the given [`std::path::PathBuf`]s
+/// yielding the paths in sorterd order.
+#[must_use = "iterators are lazy and do nothing unless consumed"]
+struct PathSorter<I> {
+    iter: Option<I>,
+    paths: Option<Box<dyn Iterator<Item = Result<FileInfo, io::Error>>>>,
+}
+
+impl<I> PathSorter<I>
+where
+    I: Iterator<Item = Result<FileInfo, io::Error>>,
+{
+    fn new(iter: I) -> Self {
+        Self {
+            iter: Some(iter),
+            paths: None,
+        }
+    }
+}
+
+impl<I> Iterator for PathSorter<I>
+where
+    I: Iterator<Item = Result<FileInfo, io::Error>>,
+{
+    type Item = Result<FileInfo, io::Error>;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            match self.paths.as_mut() {
+                Some(paths) => return paths.next(),
+                None => match self.iter.take() {
+                    Some(iter) => {
+                        let mut vec = Vec::from_iter(iter);
+                        vec.sort_by_cached_key(|key| match key {
+                            Ok(fi) => fi.timestamp,
+                            Err(_) => Utc::now(),
+                        });
+
+                        self.paths = Some(Box::new(vec.into_iter()));
+                        continue;
+                    }
+                    None => return None,
+                },
             }
         }
     }

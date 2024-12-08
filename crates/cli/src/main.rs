@@ -29,14 +29,6 @@ fn main() {
             let diagnostic_data = DiagnosticData::new(&path).expect("valid path");
             println!("{diagnostic_data:?}");
 
-            // for metrics in diagnostic_data {
-            //     let metrics_chunk = metrics.unwrap();
-            //
-            //     for m in metrics_chunk.metrics {
-            //         println!("{}", m.name)
-            //     }
-            // }
-
             let vis = VisLayout::init(&output_path).expect("initializing data vis directory failed");
             vis.generate_report(diagnostic_data).expect("generating vis report failed");
         }
