@@ -1,6 +1,8 @@
 use std::ffi::OsStr;
 use std::path::PathBuf;
 
+use chrono::DateTime;
+use chrono::Utc;
 use clap::Parser;
 use clap::Subcommand;
 
@@ -26,6 +28,18 @@ pub(crate) enum Commands {
         /// directory is used.
         #[clap(short, long, parse(try_from_os_str = parse_path))]
         output_path: Option<PathBuf>,
+
+        /// Filter metrics by the host name.
+        #[clap(short, long)]
+        node: Option<String>,
+
+        /// Specify the start timestamp of the metrics.
+        #[clap(short, long)]
+        start_timestamp: Option<DateTime<Utc>>,
+
+        /// Specify the end timestamp of the metrics.
+        #[clap(short, long)]
+        end_timestamp: Option<DateTime<Utc>>,
     },
 }
 

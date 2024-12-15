@@ -16,6 +16,7 @@ use chrono::Utc;
 use crate::error::MetricsDecoderError;
 use crate::error::ValueAccessResultExt;
 use crate::filter;
+use crate::filter::HostnameFilter;
 use crate::filter::MetricsFilter;
 use crate::iter::IteratorExt;
 use crate::metrics::MetricsChunk;
@@ -33,9 +34,9 @@ impl MetricsIterator {
         let filter = Rc::new(filter);
         let traverse_dir = TraverseDir::new(root_dir);
         let path_sorter = PathSorter::new(traverse_dir);
-        let path_filter = Self::filter_path(path_sorter, filter.clone());
+        // let path_filter = Self::filter_path(path_sorter, filter.clone());
 
-        let metrics_reader = Self::read_metrics(path_filter, filter.clone());
+        let metrics_reader = Self::read_metrics(path_sorter, filter.clone());
         let metric_chunks = Box::new(metrics_reader);
 
         Self { metric_chunks }
@@ -76,7 +77,11 @@ impl MetricsIterator {
     where
         I: Iterator<Item = Result<Document, de::Error>>,
     {
-        iter.map(|item| item.map_err(MetricsDecoderError::from))
+        let bson_documents = iter.map(|item| item.map_err(MetricsDecoderError::from));
+        let hostname_filter = HostnameFilter::new(bson_documents, filter.hostname.clone());
+
+        hostname_filter
+            // TODO: Filtering only by _id timestamp may miss documents
             .try_filter(move |d| filter::timestamp(d, &filter))
             .try_filter(filter::metrics_chunk)
             .map(Self::decode_metrics_chunk)
@@ -170,22 +175,21 @@ impl Iterator for TraverseDir {
 struct FileInfo {
     path: PathBuf,
     timestamp: DateTime<Utc>,
+    uid: u16,
 }
 
 impl FileInfo {
     pub fn from(path: PathBuf) -> Result<FileInfo, io::Error> {
-        let timestamp = match path.extension() {
-            Some(ext) => {
-                let ext = ext.to_str().ok_or_else(|| {
+        let (timestamp, uid) = match path.extension() {
+            Some(extension) => {
+                let extension = extension.to_str().ok_or_else(|| {
                     io::Error::new(
                         ErrorKind::InvalidData,
-                        format!("the '{ext:?}' file extension is not a valid UTF-8"),
+                        format!("the file extension ({extension:?}) is not valid UTF-8"),
                     )
                 })?;
 
-                DateTime::parse_from_rfc3339(ext)
-                    .map_err(|e| io::Error::new(ErrorKind::Other, e))?
-                    .with_timezone(&Utc)
+                Self::parse_timestamp_and_uid(extension)
             }
             None => {
                 return Err(io::Error::new(
@@ -193,9 +197,43 @@ impl FileInfo {
                     format!("the '{path:?}' path does not have a file extension"),
                 ))
             }
-        };
+        }?;
 
-        Ok(Self { path, timestamp })
+        Ok(Self {
+            path,
+            timestamp,
+            uid,
+        })
+    }
+
+    fn parse_timestamp_and_uid(extension: &str) -> Result<(DateTime<Utc>, u16), io::Error> {
+        const TIMESTAMP_FORMAT: &str = "%Y-%m-%dT%H-%M-%S%#z";
+
+        match extension.rsplit_once("-") {
+            Some((ts, uid)) => {
+                let ts = DateTime::parse_from_str(ts, TIMESTAMP_FORMAT)
+                    .map_err(|e| {
+                        io::Error::new(
+                            ErrorKind::Other,
+                            format!("parsing file extension timestamp ({ts}) failed: {e}"),
+                        )
+                    })?
+                    .with_timezone(&Utc);
+
+                let uid = uid.parse::<u16>().map_err(|e| {
+                    io::Error::new(
+                        ErrorKind::Other,
+                        format!("parsing file extension uid ({uid}) failed: {e}"),
+                    )
+                })?;
+
+                Ok((ts, uid))
+            }
+            None => Err(io::Error::new(
+                ErrorKind::Other,
+                format!("splitting file extension ({extension}) into ts and uid failed"),
+            )),
+        }
     }
 }
 
@@ -234,8 +272,8 @@ where
                     Some(iter) => {
                         let mut vec = Vec::from_iter(iter);
                         vec.sort_by_cached_key(|key| match key {
-                            Ok(fi) => fi.timestamp,
-                            Err(_) => Utc::now(),
+                            Ok(fi) => (fi.timestamp, fi.uid),
+                            Err(_) => (Utc::now(), 0),
                         });
 
                         self.paths = Some(Box::new(vec.into_iter()));

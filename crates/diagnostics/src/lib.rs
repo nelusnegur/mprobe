@@ -1,10 +1,10 @@
 mod bytes;
 mod compression;
-mod filter;
 mod iter;
 mod read;
 
 pub mod error;
+pub mod filter;
 pub mod metadata;
 pub mod metrics;
 
@@ -60,7 +60,6 @@ impl IntoIterator for DiagnosticData<'_> {
         MetricsIterator::new(self.entries, self.filter)
     }
 }
-
 
 pub struct DiagnosticDataBuilder<'a> {
     path: &'a Path,
