@@ -12,9 +12,9 @@ use bson::Document;
 use chrono::DateTime;
 use chrono::Utc;
 
+use crate::bson::DocumentKind;
+use crate::bson::ReadDocument;
 use crate::error::MetricsDecoderError;
-use crate::error::ValueAccessResultExt;
-use crate::filter;
 use crate::filter::HostnameFilter;
 use crate::filter::TimeWindow;
 use crate::iter::IteratorExt;
@@ -80,8 +80,8 @@ impl MetricsIterator {
 
         hostname_filter
             // TODO: Filtering only by _id timestamp may miss documents
-            .try_filter(move |d| filter::timestamp(d, &time_window))
-            .try_filter(filter::metrics_chunk)
+            .try_filter(move |d| d.timestamp().map(|ts| time_window.contains(ts)))
+            .try_filter(|d| d.kind().map(|dt| dt == DocumentKind::MetricsChunk))
             .map(Self::decode_metrics_chunk)
     }
 
@@ -91,10 +91,7 @@ impl MetricsIterator {
     ) -> Result<MetricsChunk, MetricsDecoderError> {
         match item {
             Ok(document) => {
-                let data = document
-                    .get_binary_generic(METRICS_CHUNK_KEY)
-                    .map_value_access_err(METRICS_CHUNK_KEY)?;
-
+                let data = document.metrics_chunk()?;
                 let mut data = Cursor::new(data);
                 MetricsChunk::from_reader(&mut data)
             }
@@ -102,8 +99,6 @@ impl MetricsIterator {
         }
     }
 }
-
-const METRICS_CHUNK_KEY: &str = "data";
 
 impl Iterator for MetricsIterator {
     type Item = Result<MetricsChunk, MetricsDecoderError>;

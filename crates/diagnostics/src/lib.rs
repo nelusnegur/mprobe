@@ -1,3 +1,4 @@
+mod bson;
 mod bytes;
 mod compression;
 mod iter;
