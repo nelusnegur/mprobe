@@ -3,7 +3,7 @@ mod cli;
 use std::env;
 
 use clap::Parser;
-use mprobe::diagnostics::filter::MetricsFilter;
+use mprobe::diagnostics::MetricsFilter;
 use mprobe::diagnostics::DiagnosticData;
 use mprobe::vis::layout::VisLayout;
 
@@ -27,11 +27,6 @@ fn main() {
                 output_path.display()
             );
 
-            // let mut builder = DiagnosticDataBuilder::new(&path);
-            // builder.host(String::from("4014e34491b5"));
-            // builder.host(hostname);
-
-            // let diagnostic_data = builder.build().expect("valid path");
             let filter = MetricsFilter::new(hostname, start_timestamp, end_timestamp);
             let diagnostic_data = DiagnosticData::filter(&path, filter).expect("valid path");
 

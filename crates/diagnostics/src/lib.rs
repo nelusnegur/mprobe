@@ -17,7 +17,6 @@ use chrono::DateTime;
 use chrono::Utc;
 
 use crate::error::MetricsDecoderError;
-use crate::filter::MetricsFilter;
 use crate::metrics::MetricsChunk;
 use crate::read::MetricsIterator;
 
@@ -101,5 +100,26 @@ impl<'a> DiagnosticDataBuilder<'a> {
         };
 
         DiagnosticData::filter(self.path, filter)
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct MetricsFilter {
+    pub(crate) hostname: Option<String>,
+    pub(crate) start_timestamp: Option<DateTime<Utc>>,
+    pub(crate) end_timestamp: Option<DateTime<Utc>>,
+}
+
+impl MetricsFilter {
+    pub fn new(
+        hostname: Option<String>,
+        start_timestamp: Option<DateTime<Utc>>,
+        end_timestamp: Option<DateTime<Utc>>,
+    ) -> Self {
+        Self {
+            hostname,
+            start_timestamp,
+            end_timestamp,
+        }
     }
 }

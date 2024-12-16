@@ -6,7 +6,6 @@ use std::io::Cursor;
 use std::io::ErrorKind;
 use std::io::Read;
 use std::path::PathBuf;
-use std::rc::Rc;
 
 use bson::de;
 use bson::Document;
@@ -17,9 +16,10 @@ use crate::error::MetricsDecoderError;
 use crate::error::ValueAccessResultExt;
 use crate::filter;
 use crate::filter::HostnameFilter;
-use crate::filter::MetricsFilter;
+use crate::filter::TimeWindow;
 use crate::iter::IteratorExt;
 use crate::metrics::MetricsChunk;
+use crate::MetricsFilter;
 
 /// An iterator that reads recursively diagnostic data files from a root directory
 /// identified by a [`std::fs::Path`], decodes metrics from BSON documents
@@ -31,40 +31,37 @@ pub struct MetricsIterator {
 
 impl MetricsIterator {
     pub(crate) fn new(root_dir: ReadDir, filter: MetricsFilter) -> Self {
-        let filter = Rc::new(filter);
         let traverse_dir = TraverseDir::new(root_dir);
         let path_sorter = PathSorter::new(traverse_dir);
+        // TODO: Fix path filter
         // let path_filter = Self::filter_path(path_sorter, filter.clone());
 
-        let metrics_reader = Self::read_metrics(path_sorter, filter.clone());
+        let hostname = filter.hostname;
+        let time_window = TimeWindow::new(filter.start_timestamp, filter.end_timestamp);
+
+        let metrics_reader = Self::read_metrics(path_sorter, hostname, time_window);
         let metric_chunks = Box::new(metrics_reader);
 
         Self { metric_chunks }
     }
 
-    fn filter_path<I>(
-        iter: I,
-        filter: Rc<MetricsFilter>,
-    ) -> impl Iterator<Item = Result<FileInfo, io::Error>>
-    where
-        I: Iterator<Item = Result<FileInfo, io::Error>>,
-    {
-        iter.filter(move |item| match item {
-            Ok(fi) => filter.by_timestamp(fi.timestamp),
-            Err(_) => true,
-        })
-    }
-
     fn read_metrics<I>(
         iter: I,
-        filter: Rc<MetricsFilter>,
+        hostname: Option<String>,
+        time_window: TimeWindow,
     ) -> impl Iterator<Item = Result<MetricsChunk, MetricsDecoderError>>
     where
         I: Iterator<Item = Result<FileInfo, io::Error>>,
     {
         iter.map(move |item| {
             item.and_then(|f| File::open(f.path))
-                .map(|file| Self::decode_metrics(BsonReader::new(file), filter.clone()))
+                .map(|file| {
+                    Self::decode_metrics(
+                        BsonReader::new(file),
+                        hostname.clone(),
+                        time_window.clone(),
+                    )
+                })
                 .map_err(MetricsDecoderError::from)
         })
         .try_flatten()
@@ -72,17 +69,18 @@ impl MetricsIterator {
 
     fn decode_metrics<I>(
         iter: I,
-        filter: Rc<MetricsFilter>,
+        hostname: Option<String>,
+        time_window: TimeWindow,
     ) -> impl Iterator<Item = Result<MetricsChunk, MetricsDecoderError>>
     where
         I: Iterator<Item = Result<Document, de::Error>>,
     {
         let bson_documents = iter.map(|item| item.map_err(MetricsDecoderError::from));
-        let hostname_filter = HostnameFilter::new(bson_documents, filter.hostname.clone());
+        let hostname_filter = HostnameFilter::new(bson_documents, hostname);
 
         hostname_filter
             // TODO: Filtering only by _id timestamp may miss documents
-            .try_filter(move |d| filter::timestamp(d, &filter))
+            .try_filter(move |d| filter::timestamp(d, &time_window))
             .try_filter(filter::metrics_chunk)
             .map(Self::decode_metrics_chunk)
     }

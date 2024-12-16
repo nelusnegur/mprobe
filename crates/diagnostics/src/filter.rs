@@ -15,39 +15,29 @@ const HOST_INFO_KEY: &str = "hostInfo";
 const SYSTEM_KEY: &str = "system";
 const HOSTNAME_KEY: &str = "hostname";
 
-#[derive(Debug, Default)]
-pub struct MetricsFilter {
-    pub(crate) hostname: Option<String>,
-    pub(crate) start_timestamp: Option<DateTime<Utc>>,
-    pub(crate) end_timestamp: Option<DateTime<Utc>>,
+#[derive(Debug, Default, Clone)]
+pub(crate) struct TimeWindow {
+    start: Option<DateTime<Utc>>,
+    end: Option<DateTime<Utc>>,
 }
 
-impl MetricsFilter {
+impl TimeWindow {
     pub fn new(
-        hostname: Option<String>,
         start_timestamp: Option<DateTime<Utc>>,
         end_timestamp: Option<DateTime<Utc>>,
     ) -> Self {
         Self {
-            hostname,
-            start_timestamp,
-            end_timestamp,
+            start: start_timestamp,
+            end: end_timestamp,
         }
     }
 
-    pub(crate) fn by_timestamp(&self, timestamp: DateTime<Utc>) -> bool {
-        match (self.start_timestamp, self.end_timestamp) {
+    pub(crate) fn contains(&self, timestamp: DateTime<Utc>) -> bool {
+        match (self.start, self.end) {
             (None, None) => true,
             (None, Some(ref end)) => timestamp.le(end),
             (Some(ref start), None) => timestamp.ge(start),
             (Some(ref start), Some(ref end)) => timestamp.ge(start) && timestamp.le(end),
-        }
-    }
-
-    pub(crate) fn by_hostname(&self, hostname: &str) -> bool {
-        match self.hostname {
-            Some(ref host) => host == hostname,
-            None => true,
         }
     }
 }
@@ -62,12 +52,12 @@ pub(crate) fn metrics_chunk(document: &Document) -> Result<bool, MetricsDecoderE
 
 pub(crate) fn timestamp(
     document: &Document,
-    filter: &MetricsFilter,
+    filter: &TimeWindow,
 ) -> Result<bool, MetricsDecoderError> {
     document
         .get_datetime(ID_KEY)
         .map_value_access_err(ID_KEY)
-        .map(|ts| filter.by_timestamp(ts.to_chrono()))
+        .map(|ts| filter.contains(ts.to_chrono()))
         .map_err(MetricsDecoderError::from)
 }
 
