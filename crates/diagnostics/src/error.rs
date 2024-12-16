@@ -25,6 +25,9 @@ pub enum MetricsDecoderError {
     /// A [`KeyValueAccessError`] encountered while accessing BSON fields.
     KeyValueAccess(KeyValueAccessError),
 
+    /// Unknown document type.
+    UnknownDocumentKind(i32),
+
     /// The metrics count from the reference document and the metrics count from samples do not
     /// match.
     MetricsCountMismatch,
@@ -60,6 +63,7 @@ impl Display for MetricsDecoderError {
             MetricsDecoderError::MetricNotFound { name } => write!(f, "\"{}\" metric not found", name),
             MetricsDecoderError::MetricValueNotFound { name } => write!(f, "there are no values for \"{}\" metric", name),
             MetricsDecoderError::IntConversion(inner) => Display::fmt(inner, f),
+            MetricsDecoderError::UnknownDocumentKind(value) => write!(f, "Unknonw document type value: {value}"),
         }
     }
 }
@@ -75,6 +79,7 @@ impl Error for MetricsDecoderError {
             MetricsDecoderError::MetricNotFound { .. } => None,
             MetricsDecoderError::MetricValueNotFound { .. } => None,
             MetricsDecoderError::IntConversion(inner) => Some(inner),
+            MetricsDecoderError::UnknownDocumentKind(_) => None,
         }
     }
 }

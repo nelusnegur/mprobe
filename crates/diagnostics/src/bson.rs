@@ -19,6 +19,7 @@ const HOSTNAME_KEY: &str = "hostname";
 pub(crate) enum DocumentKind {
     Metadata = 0,
     MetricsChunk,
+    PeriodicMetadata,
 }
 
 impl TryFrom<i32> for DocumentKind {
@@ -28,8 +29,8 @@ impl TryFrom<i32> for DocumentKind {
         match value {
             0 => Ok(DocumentKind::Metadata),
             1 => Ok(DocumentKind::MetricsChunk),
-            // TODO: Define custom error
-            _ => Err(MetricsDecoderError::MetricsCountMismatch),
+            2 => Ok(DocumentKind::PeriodicMetadata),
+            val => Err(MetricsDecoderError::UnknownDocumentKind(val)),
         }
     }
 }
