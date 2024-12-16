@@ -7,7 +7,7 @@ use crate::error::ValueAccessResultExt;
 
 const ID_KEY: &str = "_id";
 const DATA_TYPE_KEY: &str = "type";
-const METRICS_DOC_KEY: &str = "doc";
+const METADATA_KEY: &str = "doc";
 const METRICS_CHUNK_KEY: &str = "data";
 
 const HOST_INFO_KEY: &str = "hostInfo";
@@ -58,7 +58,10 @@ impl ReadDocument for Document {
     }
 
     fn hostname(&self) -> Result<&str, MetricsDecoderError> {
-        let host_info = self
+        let metadata = self.get_document(METADATA_KEY)
+            .map_value_access_err(METADATA_KEY)?;
+
+        let host_info = metadata
             .get_document(HOST_INFO_KEY)
             .map_value_access_err(HOST_INFO_KEY)?;
 

@@ -2,10 +2,9 @@ use bson::Document;
 use chrono::DateTime;
 use chrono::Utc;
 
+use crate::bson::DocumentKind;
 use crate::bson::ReadDocument;
 use crate::error::MetricsDecoderError;
-
-const METRICS_DOC_KEY: &str = "doc";
 
 #[derive(Debug, Default, Clone)]
 pub(crate) struct TimeWindow {
@@ -61,21 +60,26 @@ where
         loop {
             match self.iter.next() {
                 Some(item) => match item {
-                    // TODO: Filter first on document type given that in each document
-                    // first item is the metadata and it's a rare occurrence
-                    Ok(ref doc) => match doc.get_document(METRICS_DOC_KEY) {
-                        Ok(doc) => match doc.hostname() {
+                    Ok(ref doc) => match doc.kind() {
+                        Ok(DocumentKind::Metadata) => match doc.hostname() {
                             Ok(hostname) => {
                                 self.are_host_metrics =
                                     self.hostname.as_ref().is_none_or(|hn| hn == hostname);
-                                continue;
+
+                                if self.are_host_metrics {
+                                    return Some(item);
+                                }
                             }
                             Err(err) => return Some(Err(err)),
                         },
-                        _ if self.are_host_metrics => return Some(item),
-                        _ => continue,
+                        Ok(_) => {
+                            if self.are_host_metrics {
+                                return Some(item);
+                            }
+                        }
+                        Err(err) => return Some(Err(err)),
                     },
-                    err @ Err(_) => return Some(err),
+                    doc => return Some(doc),
                 },
                 None => return None,
             }
