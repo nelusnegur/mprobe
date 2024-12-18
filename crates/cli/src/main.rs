@@ -14,6 +14,7 @@ fn main() {
     let cli = Cli::parse();
 
     match cli.command {
+        // TODO: Validate start_timestamp < end_timestamp
         Commands::Visualize { path, output_path, node: hostname, start_timestamp, end_timestamp } => {
             let output_path = if let Some(out) = output_path {
                 out

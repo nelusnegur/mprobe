@@ -1,12 +1,13 @@
 use bson::Document;
 use chrono::DateTime;
+use chrono::Duration;
 use chrono::Utc;
 
 use crate::bson::DocumentKind;
 use crate::bson::ReadDocument;
 use crate::error::MetricsDecoderError;
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default)]
 pub(crate) struct TimeWindow {
     start: Option<DateTime<Utc>>,
     end: Option<DateTime<Utc>>,
@@ -23,16 +24,23 @@ impl TimeWindow {
         }
     }
 
-    pub(crate) fn contains(&self, timestamp: DateTime<Utc>) -> bool {
+    pub(crate) fn includes(&self, timestamp: &DateTime<Utc>) -> bool {
+        self.includes_with_margin(timestamp, Duration::zero())
+    }
+
+    pub(crate) fn includes_with_margin(&self, timestamp: &DateTime<Utc>, margin: Duration) -> bool {
         match (self.start, self.end) {
             (None, None) => true,
-            (None, Some(ref end)) => timestamp.le(end),
-            (Some(ref start), None) => timestamp.ge(start),
-            (Some(ref start), Some(ref end)) => timestamp.ge(start) && timestamp.le(end),
+            (Some(start), None) => timestamp.ge(&(start - margin)),
+            (None, Some(end)) => timestamp.le(&(end + margin)),
+            (Some(start), Some(end)) => {
+                timestamp.ge(&(start - margin)) && timestamp.le(&(end + margin))
+            }
         }
     }
 }
 
+#[must_use = "iterators are lazy and do nothing unless consumed"]
 pub(crate) struct HostnameFilter<I> {
     iter: I,
     hostname: Option<String>,

@@ -6,10 +6,12 @@ use std::io::Cursor;
 use std::io::ErrorKind;
 use std::io::Read;
 use std::path::PathBuf;
+use std::rc::Rc;
 
 use bson::de;
 use bson::Document;
 use chrono::DateTime;
+use chrono::Duration;
 use chrono::Utc;
 
 use crate::bson::DocumentKind;
@@ -31,15 +33,17 @@ pub struct MetricsIterator {
 
 impl MetricsIterator {
     pub(crate) fn new(root_dir: ReadDir, filter: MetricsFilter) -> Self {
+        let hostname = filter.hostname;
+        let time_window = Rc::new(TimeWindow::new(
+            filter.start_timestamp,
+            filter.end_timestamp,
+        ));
+
         let traverse_dir = TraverseDir::new(root_dir);
         let path_sorter = PathSorter::new(traverse_dir);
-        // TODO: Fix path filter
-        // let path_filter = Self::filter_path(path_sorter, filter.clone());
+        let path_filter = PathFilter::new(path_sorter, time_window.clone());
 
-        let hostname = filter.hostname;
-        let time_window = TimeWindow::new(filter.start_timestamp, filter.end_timestamp);
-
-        let metrics_reader = Self::read_metrics(path_sorter, hostname, time_window);
+        let metrics_reader = Self::read_metrics(path_filter, hostname, time_window.clone());
         let metric_chunks = Box::new(metrics_reader);
 
         Self { metric_chunks }
@@ -48,7 +52,7 @@ impl MetricsIterator {
     fn read_metrics<I>(
         iter: I,
         hostname: Option<String>,
-        time_window: TimeWindow,
+        time_window: Rc<TimeWindow>,
     ) -> impl Iterator<Item = Result<MetricsChunk, MetricsDecoderError>>
     where
         I: Iterator<Item = Result<FileInfo, io::Error>>,
@@ -70,7 +74,7 @@ impl MetricsIterator {
     fn decode_metrics<I>(
         iter: I,
         hostname: Option<String>,
-        time_window: TimeWindow,
+        time_window: Rc<TimeWindow>,
     ) -> impl Iterator<Item = Result<MetricsChunk, MetricsDecoderError>>
     where
         I: Iterator<Item = Result<Document, de::Error>>,
@@ -80,7 +84,7 @@ impl MetricsIterator {
 
         hostname_filter
             // TODO: Filtering only by _id timestamp may miss documents
-            .try_filter(move |d| d.timestamp().map(|ts| time_window.contains(ts)))
+            .try_filter(move |d| d.timestamp().map(|ts| time_window.includes(&ts)))
             .try_filter(|d| d.kind().map(|dt| dt == DocumentKind::MetricsChunk))
             .map(Self::decode_metrics_chunk)
     }
@@ -165,6 +169,7 @@ impl Iterator for TraverseDir {
     }
 }
 
+#[derive(Debug)]
 struct FileInfo {
     path: PathBuf,
     timestamp: DateTime<Utc>,
@@ -226,6 +231,57 @@ impl FileInfo {
                 ErrorKind::Other,
                 format!("splitting file extension ({extension}) into ts and uid failed"),
             )),
+        }
+    }
+}
+
+/// An iterator that traverses the given [`std::path::PathBuf`]s
+/// filtering paths based on the file name.
+/// It assumes the items in the inner iterator are yielded sorted
+/// in ascending order.
+#[must_use = "iterators are lazy and do nothing unless consumed"]
+struct PathFilter<I> {
+    iter: I,
+    time_window: Rc<TimeWindow>,
+    time_margin: Duration,
+}
+
+impl<I> PathFilter<I>
+where
+    I: Iterator<Item = Result<FileInfo, io::Error>>,
+{
+    fn new(iter: I, time_window: Rc<TimeWindow>) -> Self {
+        Self {
+            iter,
+            time_window,
+            time_margin: Duration::hours(4),
+        }
+    }
+}
+
+impl<I> Iterator for PathFilter<I>
+where
+    I: Iterator<Item = Result<FileInfo, io::Error>>,
+{
+    type Item = Result<FileInfo, io::Error>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            if let Some(item) = self.iter.next() {
+                match item {
+                    Ok(fi) => {
+                        if self
+                            .time_window
+                            .includes_with_margin(&fi.timestamp, self.time_margin)
+                        {
+                            return Some(Ok(fi));
+                        }
+                    }
+                    Err(err) => return Some(Err(err)),
+                }
+            } else {
+                return None;
+            }
         }
     }
 }
