@@ -58,49 +58,26 @@ impl MetricsIterator {
         I: Iterator<Item = Result<FileInfo, io::Error>>,
     {
         iter.map(move |item| {
+            let time_window = time_window.clone();
+            let hostname = hostname.clone();
+
             item.and_then(|f| File::open(f.path))
                 .map(|file| {
-                    Self::decode_metrics(
-                        BsonReader::new(file),
-                        hostname.clone(),
-                        time_window.clone(),
-                    )
+                    let bson_documents =
+                        BsonReader::new(file).map(|item| item.map_err(MetricsDecoderError::from));
+                    let hostname_filter = HostnameFilter::new(bson_documents, hostname);
+                    let timestamp_filter = hostname_filter
+                        // TODO: Filtering only by _id timestamp may miss documents
+                        .try_filter(move |d| d.timestamp().map(|ts| time_window.includes(&ts)));
+
+                    let metrics_chunk_filter = timestamp_filter
+                        .try_filter(|d| d.kind().map(|dt| dt == DocumentKind::MetricsChunk));
+
+                    MetricsChunkReader::new(metrics_chunk_filter)
                 })
                 .map_err(MetricsDecoderError::from)
         })
         .try_flatten()
-    }
-
-    fn decode_metrics<I>(
-        iter: I,
-        hostname: Option<String>,
-        time_window: Rc<TimeWindow>,
-    ) -> impl Iterator<Item = Result<MetricsChunk, MetricsDecoderError>>
-    where
-        I: Iterator<Item = Result<Document, de::Error>>,
-    {
-        let bson_documents = iter.map(|item| item.map_err(MetricsDecoderError::from));
-        let hostname_filter = HostnameFilter::new(bson_documents, hostname);
-
-        hostname_filter
-            // TODO: Filtering only by _id timestamp may miss documents
-            .try_filter(move |d| d.timestamp().map(|ts| time_window.includes(&ts)))
-            .try_filter(|d| d.kind().map(|dt| dt == DocumentKind::MetricsChunk))
-            .map(Self::decode_metrics_chunk)
-    }
-
-    #[inline]
-    fn decode_metrics_chunk(
-        item: Result<Document, MetricsDecoderError>,
-    ) -> Result<MetricsChunk, MetricsDecoderError> {
-        match item {
-            Ok(document) => {
-                let data = document.metrics_chunk()?;
-                let mut data = Cursor::new(data);
-                MetricsChunk::from_reader(&mut data)
-            }
-            Err(error) => Err(error),
-        }
     }
 }
 
@@ -265,6 +242,7 @@ where
 {
     type Item = Result<FileInfo, io::Error>;
 
+    #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         loop {
             if let Some(item) = self.iter.next() {
@@ -358,5 +336,40 @@ impl<R: Read> Iterator for BsonReader<R> {
             Err(de::Error::Io(error)) if error.kind() == io::ErrorKind::UnexpectedEof => None,
             Err(error) => Some(Err(error)),
         }
+    }
+}
+
+/// An iterator that yields BSON documents fron an underlying [`Read`].
+#[must_use = "iterators are lazy and do nothing unless consumed"]
+#[derive(Debug, Clone)]
+struct MetricsChunkReader<I> {
+    iter: I,
+}
+
+impl<I> MetricsChunkReader<I>
+where
+    I: Iterator<Item = Result<Document, MetricsDecoderError>>,
+{
+    pub fn new(iter: I) -> Self {
+        Self { iter }
+    }
+}
+
+impl<I: Iterator> Iterator for MetricsChunkReader<I>
+where
+    I: Iterator<Item = Result<Document, MetricsDecoderError>>,
+{
+    type Item = Result<MetricsChunk, MetricsDecoderError>;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        self.iter.next().map(|item| {
+            item.and_then(|document| {
+                document.metrics_chunk().and_then(|data| {
+                    let mut data = Cursor::new(data);
+                    MetricsChunk::from_reader(&mut data)
+                })
+            })
+        })
     }
 }
