@@ -14,6 +14,7 @@ pub(crate) trait IteratorExt {
     /// Creates a fallible iterator that flattens nested structure
     /// propagating errors from both the inner and outer elements.
     #[inline]
+    #[allow(dead_code)]
     fn try_flatten<U, T, E>(self) -> TryFlatten<Self, U>
     where
         Self: Iterator<Item = Result<U, E>> + Sized,

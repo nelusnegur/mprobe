@@ -33,7 +33,6 @@ pub struct MetricsIterator {
 
 impl MetricsIterator {
     pub(crate) fn new(root_dir: ReadDir, filter: MetricsFilter) -> Self {
-        let hostname = filter.hostname;
         let time_window = Rc::new(TimeWindow::new(
             filter.start_timestamp,
             filter.end_timestamp,
@@ -43,41 +42,18 @@ impl MetricsIterator {
         let path_sorter = PathSorter::new(traverse_dir);
         let path_filter = PathFilter::new(path_sorter, time_window.clone());
 
-        let metrics_reader = Self::read_metrics(path_filter, hostname, time_window.clone());
+        let file_reader = FileReader::new(path_filter);
+        let hostname_filter = HostnameFilter::new(file_reader, filter.hostname);
+        let timestamp_filter = hostname_filter
+            // TODO: Filtering only by _id timestamp may miss documents
+            .try_filter(move |d| d.timestamp().map(|ts| time_window.includes(&ts)));
+
+        let metrics_chunk_filter =
+            timestamp_filter.try_filter(|d| d.kind().map(|dt| dt == DocumentKind::MetricsChunk));
+        let metrics_reader = MetricsChunkReader::new(metrics_chunk_filter);
         let metric_chunks = Box::new(metrics_reader);
 
         Self { metric_chunks }
-    }
-
-    fn read_metrics<I>(
-        iter: I,
-        hostname: Option<String>,
-        time_window: Rc<TimeWindow>,
-    ) -> impl Iterator<Item = Result<MetricsChunk, MetricsDecoderError>>
-    where
-        I: Iterator<Item = Result<FileInfo, io::Error>>,
-    {
-        iter.map(move |item| {
-            let time_window = time_window.clone();
-            let hostname = hostname.clone();
-
-            item.and_then(|f| File::open(f.path))
-                .map(|file| {
-                    let bson_documents =
-                        BsonReader::new(file).map(|item| item.map_err(MetricsDecoderError::from));
-                    let hostname_filter = HostnameFilter::new(bson_documents, hostname);
-                    let timestamp_filter = hostname_filter
-                        // TODO: Filtering only by _id timestamp may miss documents
-                        .try_filter(move |d| d.timestamp().map(|ts| time_window.includes(&ts)));
-
-                    let metrics_chunk_filter = timestamp_filter
-                        .try_filter(|d| d.kind().map(|dt| dt == DocumentKind::MetricsChunk));
-
-                    MetricsChunkReader::new(metrics_chunk_filter)
-                })
-                .map_err(MetricsDecoderError::from)
-        })
-        .try_flatten()
     }
 }
 
@@ -307,6 +283,48 @@ where
                         continue;
                     }
                     None => return None,
+                },
+            }
+        }
+    }
+}
+
+#[must_use = "iterators are lazy and do nothing unless consumed"]
+#[derive(Debug)]
+struct FileReader<I> {
+    iter: I,
+    inner_iter: Option<BsonReader<File>>,
+}
+
+impl<I> FileReader<I> {
+    pub fn new(iter: I) -> Self {
+        Self {
+            iter,
+            inner_iter: None,
+        }
+    }
+}
+
+impl<I> Iterator for FileReader<I>
+where
+    I: Iterator<Item = Result<FileInfo, io::Error>>,
+{
+    type Item = Result<Document, MetricsDecoderError>;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            match self.inner_iter {
+                Some(ref mut inner_iter) => match inner_iter.next() {
+                    None => self.inner_iter = None,
+                    item => return item.map(|i| i.map_err(MetricsDecoderError::from)),
+                },
+                None => match self.iter.next()? {
+                    Ok(fi) => match File::open(fi.path) {
+                        Ok(file) => self.inner_iter = Some(BsonReader::new(file)),
+                        Err(err) => return Some(Err(MetricsDecoderError::from(err))),
+                    },
+                    Err(err) => return Some(Err(MetricsDecoderError::from(err))),
                 },
             }
         }
