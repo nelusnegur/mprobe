@@ -66,30 +66,27 @@ where
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         loop {
-            match self.iter.next() {
-                Some(item) => match item {
-                    Ok(ref doc) => match doc.kind() {
-                        Ok(DocumentKind::Metadata) => match doc.hostname() {
-                            Ok(hostname) => {
-                                self.are_host_metrics =
-                                    self.hostname.as_ref().is_none_or(|hn| hn == hostname);
+            match self.iter.next()? {
+                Ok(doc) => match doc.kind() {
+                    Ok(DocumentKind::Metadata) => match doc.hostname() {
+                        Ok(hostname) => {
+                            self.are_host_metrics =
+                                self.hostname.as_ref().is_none_or(|hn| hn == hostname);
 
-                                if self.are_host_metrics {
-                                    return Some(item);
-                                }
-                            }
-                            Err(err) => return Some(Err(err)),
-                        },
-                        Ok(_) => {
                             if self.are_host_metrics {
-                                return Some(item);
+                                return Some(Ok(doc));
                             }
                         }
                         Err(err) => return Some(Err(err)),
                     },
-                    doc => return Some(doc),
+                    Ok(_) => {
+                        if self.are_host_metrics {
+                            return Some(Ok(doc));
+                        }
+                    }
+                    Err(err) => return Some(Err(err)),
                 },
-                None => return None,
+                doc => return Some(doc),
             }
         }
     }

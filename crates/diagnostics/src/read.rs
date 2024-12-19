@@ -221,20 +221,16 @@ where
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         loop {
-            if let Some(item) = self.iter.next() {
-                match item {
-                    Ok(fi) => {
-                        if self
-                            .time_window
-                            .includes_with_margin(&fi.timestamp, self.time_margin)
-                        {
-                            return Some(Ok(fi));
-                        }
+            match self.iter.next()? {
+                Ok(fi) => {
+                    if self
+                        .time_window
+                        .includes_with_margin(&fi.timestamp, self.time_margin)
+                    {
+                        return Some(Ok(fi));
                     }
-                    Err(err) => return Some(Err(err)),
                 }
-            } else {
-                return None;
+                item => return Some(item),
             }
         }
     }
@@ -271,8 +267,8 @@ where
         loop {
             match self.paths.as_mut() {
                 Some(paths) => return paths.next(),
-                None => match self.iter.take() {
-                    Some(iter) => {
+                None => {
+                    if let Some(iter) = self.iter.take() {
                         let mut vec = Vec::from_iter(iter);
                         vec.sort_by_cached_key(|key| match key {
                             Ok(fi) => (fi.timestamp, fi.uid),
@@ -281,9 +277,10 @@ where
 
                         self.paths = Some(Box::new(vec.into_iter()));
                         continue;
+                    } else {
+                        return None;
                     }
-                    None => return None,
-                },
+                }
             }
         }
     }
