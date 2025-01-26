@@ -19,6 +19,7 @@ use crate::bson::ReadDocument;
 use crate::error::MetricsDecoderError;
 use crate::filter::HostnameFilter;
 use crate::filter::TimeWindow;
+use crate::filter::TimeWindowFilter;
 use crate::iter::IteratorExt;
 use crate::metrics::MetricsChunk;
 use crate::MetricsFilter;
@@ -44,14 +45,14 @@ impl MetricsIterator {
 
         let file_reader = FileReader::new(path_filter);
         let hostname_filter = HostnameFilter::new(file_reader, filter.hostname);
-        let timestamp_filter = hostname_filter
-            // TODO: Filtering only by _id timestamp may miss documents
-            .try_filter(move |d| d.timestamp().map(|ts| time_window.includes(&ts)));
+        let time_window_filter = TimeWindowFilter::new(hostname_filter, time_window.clone());
 
         let metrics_chunk_filter =
-            timestamp_filter.try_filter(|d| d.kind().map(|dt| dt == DocumentKind::MetricsChunk));
+            time_window_filter.try_filter(|d| d.kind().map(|k| k == DocumentKind::MetricsChunk));
         let metrics_reader = MetricsChunkReader::new(metrics_chunk_filter);
-        let metric_chunks = Box::new(metrics_reader);
+        let chunk_filter = metrics_reader
+            .try_filter(move |chunk| Ok(time_window.overlaps(&chunk.start_date, &chunk.end_date)));
+        let metric_chunks = Box::new(chunk_filter);
 
         Self { metric_chunks }
     }
