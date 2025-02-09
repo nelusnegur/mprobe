@@ -1,4 +1,6 @@
 mod cli;
+mod fetch;
+mod error;
 
 use std::env;
 
