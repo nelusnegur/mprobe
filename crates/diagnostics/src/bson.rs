@@ -58,7 +58,8 @@ impl ReadDocument for Document {
     }
 
     fn hostname(&self) -> Result<&str, MetricsDecoderError> {
-        let metadata = self.get_document(METADATA_KEY)
+        let metadata = self
+            .get_document(METADATA_KEY)
             .map_value_access_err(METADATA_KEY)?;
 
         let host_info = metadata

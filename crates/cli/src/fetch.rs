@@ -5,7 +5,12 @@ use std::rc::Rc;
 
 use chrono::DateTime;
 use chrono::Utc;
+use digest_auth::AuthContext;
+use digest_auth::HttpMethod;
 use reqwest::blocking::Client;
+use reqwest::blocking::RequestBuilder;
+use reqwest::blocking::Response;
+use reqwest::header::AUTHORIZATION;
 use reqwest::StatusCode;
 use serde::Deserialize;
 use serde::Serialize;
@@ -36,8 +41,11 @@ impl LogClient {
             base_url = self.base_url,
             group_id = self.group_id
         );
-        let body = serde_json::to_string(&body)?;
-        let response = self.client.post(url).body(body).send()?;
+        let response = self
+            .client
+            .post(url)
+            .json(&body)
+            .digest_auth_send(&self.credentials)?;
 
         match response.status() {
             StatusCode::CREATED => {
@@ -62,7 +70,7 @@ impl LogClient {
             group_id = self.group_id,
             job_id = job_id.0
         );
-        let response = self.client.get(url).send()?;
+        let response = self.client.get(url).digest_auth_send(&self.credentials)?;
 
         match response.status() {
             StatusCode::OK => {
@@ -87,7 +95,7 @@ impl LogClient {
             group_id = self.group_id,
             job_id = job_id.0
         );
-        let mut response = self.client.get(url).send()?;
+        let mut response = self.client.get(url).digest_auth_send(&self.credentials)?;
 
         match response.status() {
             StatusCode::OK => {
@@ -113,8 +121,8 @@ impl LogClient {
 }
 
 pub(crate) struct Credentials {
-    api_key: String,
-    api_secret: String,
+    pub api_key: String,
+    pub api_secret: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -177,16 +185,71 @@ pub(crate) enum JobStatus {
     Expired,
 }
 
+trait DigestAuth {
+    const WWW_AUTHENTICATE_HEADER: &str = "www-authenticate";
+
+    fn digest_auth_send(self, credentials: &Credentials) -> Result<Response>;
+}
+
+impl DigestAuth for RequestBuilder {
+    fn digest_auth_send(self, credentials: &Credentials) -> Result<Response> {
+        let request_builder = self
+            .try_clone()
+            .expect("request builder to be clonable for digest auth");
+
+        let response = self.send()?;
+
+        match response.status() {
+            StatusCode::UNAUTHORIZED => {
+                let headers = response.headers();
+                let Some(www_auth) = headers.get(Self::WWW_AUTHENTICATE_HEADER) else {
+                    let message = format!("Digest authentication failed: the server did not include the {header} header in the response.", header = Self::WWW_AUTHENTICATE_HEADER);
+                    return Err(FetchError::DigestAuth(message));
+                };
+
+                // Create the Request object to read the necessary information
+                // required for the digest authentication, without cloning
+                // the parts.
+                let (client, request) = request_builder.build_split();
+                let request = request?;
+
+                let auth_context = AuthContext::new_with_method(
+                    &credentials.api_key,
+                    &credentials.api_secret,
+                    request.url().path(),
+                    request.body().and_then(|b| b.as_bytes()),
+                    HttpMethod::from(request.method().as_str()),
+                );
+                let mut prompt = digest_auth::parse(www_auth.to_str()?)?;
+                let header = prompt.respond(&auth_context)?.to_header_string();
+
+                let request_builder = RequestBuilder::from_parts(client, request);
+                let response = request_builder.header(AUTHORIZATION, header).send()?;
+
+                Ok(response)
+            }
+            status if status.is_success() => Ok(response),
+            status => {
+                let message = response.text()?;
+                let error = FetchError::DigestAuth(format!(
+                    "Digest authentication failed with status code {status}. {message}",
+                ));
+                Err(error)
+            }
+        }
+    }
+}
+
 pub type Result<T> = std::result::Result<T, FetchError>;
 
 #[derive(Debug)]
 pub(crate) enum FetchError {
     Http(reqwest::Error),
+    DigestAuth(String),
     Response {
         status_code: StatusCode,
         message: String,
     },
-    Json(serde_json::Error),
     Io(io::Error),
 }
 
@@ -196,14 +259,20 @@ impl From<reqwest::Error> for FetchError {
     }
 }
 
-impl From<serde_json::Error> for FetchError {
-    fn from(error: serde_json::Error) -> Self {
-        FetchError::Json(error)
-    }
-}
-
 impl From<io::Error> for FetchError {
     fn from(error: io::Error) -> Self {
         FetchError::Io(error)
+    }
+}
+
+impl From<reqwest::header::ToStrError> for FetchError {
+    fn from(error: reqwest::header::ToStrError) -> Self {
+        FetchError::DigestAuth(format!("Digest authentication error: {error}"))
+    }
+}
+
+impl From<digest_auth::Error> for FetchError {
+    fn from(error: digest_auth::Error) -> Self {
+        FetchError::DigestAuth(format!("Digest authentication error: {error}"))
     }
 }
