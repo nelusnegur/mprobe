@@ -15,8 +15,8 @@ use reqwest::StatusCode;
 use serde::Deserialize;
 use serde::Serialize;
 
-use crate::fetch::error::Result;
 use crate::fetch::error::FetchError;
+use crate::fetch::error::Result;
 
 pub(crate) struct LogClient {
     client: Client,
@@ -38,7 +38,7 @@ impl LogClient {
         }
     }
 
-    pub fn create_job(&self, body: CreateJobBody) -> Result<JobId> {
+    pub fn create_job(&self, body: CreateJobBody) -> Result<CreatedJob> {
         let url = format!(
             "{base_url}/groups/{group_id}/logCollectionJobs",
             base_url = self.base_url,
@@ -52,8 +52,8 @@ impl LogClient {
 
         match response.status() {
             StatusCode::CREATED => {
-                let job_id: JobId = response.json()?;
-                Ok(job_id)
+                let job: CreatedJob = response.json()?;
+                Ok(job)
             }
             status_code => {
                 let message = response.text()?;
@@ -66,12 +66,12 @@ impl LogClient {
         }
     }
 
-    pub fn get_job(&self, job_id: JobId) -> Result<Job> {
+    pub fn get_job(&self, job_id: &str) -> Result<Job> {
         let url = format!(
             "{base_url}/groups/{group_id}/logCollectionJobs/{job_id}",
             base_url = self.base_url,
             group_id = self.group_id,
-            job_id = job_id.0
+            job_id = job_id
         );
         let response = self.client.get(url).digest_auth_send(&self.credentials)?;
 
@@ -91,12 +91,12 @@ impl LogClient {
         }
     }
 
-    pub fn download(&self, job_id: JobId, path: &Path) -> Result<u64> {
+    pub fn download(&self, job_id: &str, path: &Path) -> Result<u64> {
         let url = format!(
             "{base_url}/groups/{group_id}/logCollectionJobs/{job_id}/download",
             base_url = self.base_url,
             group_id = self.group_id,
-            job_id = job_id.0
+            job_id = job_id
         );
         let mut response = self.client.get(url).digest_auth_send(&self.credentials)?;
 
@@ -158,8 +158,9 @@ pub(crate) struct CreateJobBody {
 }
 
 #[derive(Debug, Deserialize)]
-#[serde(transparent)]
-pub(crate) struct JobId(String);
+pub(crate) struct CreatedJob {
+    id: String,
+}
 
 #[derive(Debug, Deserialize)]
 #[allow(dead_code)]
