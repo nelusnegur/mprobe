@@ -1,4 +1,3 @@
-use std::ffi::OsStr;
 use std::path::PathBuf;
 
 use chrono::DateTime;
@@ -7,10 +6,10 @@ use clap::Parser;
 use clap::Subcommand;
 
 #[derive(Parser)]
-#[clap(author, version, about, long_about = None)]
-#[clap(propagate_version = true)]
+#[command(author, version, about, long_about = None)]
+#[command(propagate_version = true)]
 pub(crate) struct Cli {
-    #[clap(subcommand)]
+    #[command(subcommand)]
     pub(crate) command: Commands,
 }
 
@@ -20,30 +19,30 @@ pub(crate) enum Commands {
     View {
         /// Specify the path from where to read the diagnostic data.
         /// The path must exist and it must point to a directory.
-        #[clap(short, long, parse(try_from_os_str = parse_path))]
+        #[arg(short, long, value_parser(parse_path))]
         path: PathBuf,
 
         /// Specify the path where the generated output will be created.
         /// If the output path is not specified then the current working
         /// directory is used.
-        #[clap(short, long, parse(try_from_os_str = parse_path))]
+        #[arg(short, long, value_parser(parse_path))]
         output_path: Option<PathBuf>,
 
         /// Filter metrics by the host name.
-        #[clap(short, long)]
+        #[arg(short, long)]
         node: Option<String>,
 
         /// Specify the start timestamp of the metrics.
-        #[clap(short, long)]
+        #[arg(short, long)]
         start_timestamp: Option<DateTime<Utc>>,
 
         /// Specify the end timestamp of the metrics.
-        #[clap(short, long)]
+        #[arg(short, long)]
         end_timestamp: Option<DateTime<Utc>>,
     },
 }
 
-fn parse_path(path: &OsStr) -> Result<PathBuf, String> {
+fn parse_path(path: &str) -> Result<PathBuf, String> {
     let path = PathBuf::from(path);
 
     if !path.exists() {
