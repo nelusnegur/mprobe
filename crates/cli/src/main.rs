@@ -17,7 +17,7 @@ fn main() {
 
     match cli.command {
         // TODO: Validate start_timestamp < end_timestamp
-        Commands::Visualize {
+        Commands::View {
             path,
             output_path,
             node: hostname,
