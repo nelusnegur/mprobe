@@ -2,8 +2,10 @@ use std::path::PathBuf;
 
 use chrono::DateTime;
 use chrono::Utc;
+use clap::Args;
 use clap::Parser;
 use clap::Subcommand;
+use clap::ValueEnum;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -40,6 +42,66 @@ pub(crate) enum Commands {
         #[arg(short, long)]
         end_timestamp: Option<DateTime<Utc>>,
     },
+    /// Fetch the diagnostic data from the Cloud Manager.
+    Fetch(FetchArgs),
+}
+
+#[derive(Args)]
+pub(crate) struct FetchArgs {
+    /// The project id of the Cloud Manager.
+    #[arg(short, long)]
+    project: String,
+
+    /// Specify the API key of the Cloud Manager.
+    #[arg(short = 'k', long)]
+    api_key: String,
+
+    /// Specify the API secret of the Cloud Manager.
+    #[arg(short = 's', long)]
+    api_secret: String,
+
+    /// Specify the resource type for which to fetch the diagnostic data.
+    #[arg(short = 't', long, value_enum)]
+    resource_type: Resource,
+
+    /// Specify the resource name for which to fetch the diagnostic data.
+    ///
+    /// For the `cluster` resource type, the value is the name of the
+    /// deployment or the cluster id.
+    ///
+    /// For the `replica-set` resource type, the value is the name of
+    /// the replica set in the cluster followed by the shard name.
+    /// For example, `test-123abc-shard-0`.
+    ///
+    /// For the `process` resource type, the value is the name of
+    /// the replica set followed by the node name.
+    /// For example, `Cluster0-shard-1-node-0`.
+    #[arg(short = 'n', long)]
+    resource_name: String,
+
+    /// Specify the start timestamp of the diagnostic data.
+    #[arg(short = 'r', long)]
+    from: Option<DateTime<Utc>>,
+
+    /// Specify the end timestamp of the diagnostic data.
+    #[arg(short = 'o', long)]
+    to: Option<DateTime<Utc>>,
+
+    /// Specify the path where the diagnostic data will be stored.
+    #[arg(short = 'f', long, value_parser(parse_path))]
+    path: Option<PathBuf>,
+
+    /// Specify whether the emails, hostnames, IP addresses, and namespaces
+    /// are replaced with random string values.
+    #[arg(short = 'c', long, default_value_t = true)]
+    redacted: bool,
+}
+
+#[derive(Clone, Copy, ValueEnum)]
+enum Resource {
+    Cluster,
+    ReplicaSet,
+    Process,
 }
 
 fn parse_path(path: &str) -> Result<PathBuf, String> {

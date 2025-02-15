@@ -44,5 +44,6 @@ fn main() {
             vis.generate_report(diagnostic_data)
                 .expect("generating vis report failed");
         }
+        Commands::Fetch(fetch_args) => todo!(),
     }
 }

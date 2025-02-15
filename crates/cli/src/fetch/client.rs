@@ -133,6 +133,7 @@ pub(crate) struct Credentials {
 pub(crate) enum Resource {
     Cluster,
     ReplicaSet,
+    Process,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
