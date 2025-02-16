@@ -21,32 +21,36 @@ pub(crate) struct Cli {
 #[derive(Subcommand)]
 pub(crate) enum Commands {
     /// Visualize the diagnostic data and generate a visual representation of it.
-    View {
-        /// Specify the path from where to read the diagnostic data.
-        /// The path must exist and it must point to a directory.
-        #[arg(short, long, value_parser(parse_path))]
-        path: PathBuf,
+    View(ViewArgs),
 
-        /// Specify the path where the generated output will be created.
-        /// If the output path is not specified then the current working
-        /// directory is used.
-        #[arg(short, long, value_parser(parse_path))]
-        output_path: Option<PathBuf>,
-
-        /// Filter metrics by the host name.
-        #[arg(short, long)]
-        node: Option<String>,
-
-        /// Specify the start timestamp of the metrics.
-        #[arg(short, long)]
-        start_timestamp: Option<DateTime<Utc>>,
-
-        /// Specify the end timestamp of the metrics.
-        #[arg(short, long)]
-        end_timestamp: Option<DateTime<Utc>>,
-    },
     /// Fetch the diagnostic data from the Cloud Manager.
     Fetch(FetchArgs),
+}
+
+#[derive(Args)]
+pub(crate) struct ViewArgs {
+    /// Specify the path from where to read the diagnostic data.
+    /// The path must exist and it must point to a directory.
+    #[arg(short, long, value_parser(parse_path))]
+    pub(crate) path: PathBuf,
+
+    /// Specify the path where the generated output will be created.
+    /// If the output path is not specified then the current working
+    /// directory is used.
+    #[arg(short, long, value_parser(parse_path))]
+    pub(crate) output_path: Option<PathBuf>,
+
+    /// Filter metrics by the host name.
+    #[arg(short, long)]
+    pub(crate) node: Option<String>,
+
+    /// Specify the start timestamp of the metrics.
+    #[arg(short, long)]
+    pub(crate) start_timestamp: Option<DateTime<Utc>>,
+
+    /// Specify the end timestamp of the metrics.
+    #[arg(short, long)]
+    pub(crate) end_timestamp: Option<DateTime<Utc>>,
 }
 
 #[derive(Args)]
