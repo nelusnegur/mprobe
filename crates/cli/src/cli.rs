@@ -1,3 +1,6 @@
+use std::env;
+use std::fmt::Debug;
+use std::path::Path;
 use std::path::PathBuf;
 
 use chrono::DateTime;
@@ -6,6 +9,8 @@ use clap::Args;
 use clap::Parser;
 use clap::Subcommand;
 use clap::ValueEnum;
+
+use crate::error::CliError;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -50,19 +55,19 @@ pub(crate) enum Commands {
 pub(crate) struct FetchArgs {
     /// The project id of the Cloud Manager.
     #[arg(short, long)]
-    project: String,
+    pub(crate) project: String,
 
     /// Specify the API key of the Cloud Manager.
     #[arg(short = 'k', long)]
-    api_key: String,
+    pub(crate) api_key: String,
 
     /// Specify the API secret of the Cloud Manager.
     #[arg(short = 's', long)]
-    api_secret: String,
+    pub(crate) api_secret: String,
 
     /// Specify the resource type for which to fetch the diagnostic data.
     #[arg(short = 't', long, value_enum)]
-    resource_type: Resource,
+    pub(crate) resource_type: Resource,
 
     /// Specify the resource name for which to fetch the diagnostic data.
     ///
@@ -77,28 +82,28 @@ pub(crate) struct FetchArgs {
     /// the replica set followed by the node name.
     /// For example, `Cluster0-shard-1-node-0`.
     #[arg(short = 'n', long)]
-    resource_name: String,
+    pub(crate) resource_name: String,
 
     /// Specify the start timestamp of the diagnostic data.
     #[arg(short = 'r', long)]
-    from: Option<DateTime<Utc>>,
+    pub(crate) from: Option<DateTime<Utc>>,
 
     /// Specify the end timestamp of the diagnostic data.
     #[arg(short = 'o', long)]
-    to: Option<DateTime<Utc>>,
+    pub(crate) to: Option<DateTime<Utc>>,
 
     /// Specify the path where the diagnostic data will be stored.
     #[arg(short = 'f', long, value_parser(parse_path))]
-    path: Option<PathBuf>,
+    pub(crate) path: Option<PathBuf>,
 
     /// Specify whether the emails, hostnames, IP addresses, and namespaces
     /// are replaced with random string values.
     #[arg(short = 'c', long, default_value_t = true)]
-    redacted: bool,
+    pub(crate) redacted: bool,
 }
 
 #[derive(Clone, Copy, ValueEnum)]
-enum Resource {
+pub(crate) enum Resource {
     Cluster,
     ReplicaSet,
     Process,
@@ -119,4 +124,18 @@ fn parse_path(path: &str) -> Result<PathBuf, String> {
     }
 
     Ok(path)
+}
+
+pub(crate) trait PathExt {
+    fn or_current_dir(self) -> Result<PathBuf, CliError>;
+}
+
+impl PathExt for Option<PathBuf> {
+    fn or_current_dir(self) -> Result<PathBuf, CliError> {
+        if let Some(path) = self {
+            Ok(path)
+        } else {
+            env::current_dir().map_err(|e| CliError::Path(e.to_string()))
+        }
+    }
 }

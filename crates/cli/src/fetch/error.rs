@@ -13,6 +13,14 @@ pub(crate) enum FetchError {
         message: String,
     },
     Io(io::Error),
+    Job(JobErrorStatus),
+}
+
+#[derive(Debug)]
+pub(crate) enum JobErrorStatus {
+    Failure,
+    MarkedForExpiry,
+    Expired,
 }
 
 impl From<reqwest::Error> for FetchError {

@@ -1,3 +1,4 @@
+use std::fmt::Display;
 use std::fs::OpenOptions;
 use std::io;
 use std::path::Path;
@@ -128,12 +129,31 @@ pub(crate) struct Credentials {
     pub api_secret: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+impl Credentials {
+    pub(crate) fn new(api_key: String, api_secret: String) -> Self {
+        Self {
+            api_key,
+            api_secret,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 #[serde(rename_all = "UPPERCASE")]
 pub(crate) enum Resource {
     Cluster,
     ReplicaSet,
     Process,
+}
+
+impl Display for Resource {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match *self {
+            Resource::Cluster => write!(f, "cluster"),
+            Resource::ReplicaSet => write!(f, "replica set"),
+            Resource::Process => write!(f, "process"),
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -146,41 +166,123 @@ pub(crate) enum LogType {
     BackupAgent,
 }
 
+impl Display for LogType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match *self {
+            LogType::Ftdc => write!(f, "FTDC"),
+            LogType::Mongodb => write!(f, "MongoDB"),
+            LogType::MonitoringAgent => write!(f, "Monitoring agent"),
+            LogType::AutomationAgent => write!(f, "Automation agent"),
+            LogType::BackupAgent => write!(f, "Backup agent"),
+        }
+    }
+}
+
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct CreateJobBody {
+pub(crate) struct CreateJobBody<'n> {
     resource_type: Resource,
-    resource_name: String,
+    resource_name: &'n str,
     size_requested_per_file_bytes: u64,
     log_types: Vec<LogType>,
     redacted: bool,
     log_collection_from_date: Option<DateTime<Utc>>,
     log_collection_to_date: Option<DateTime<Utc>>,
+}
+impl<'n> CreateJobBody<'n> {
+    pub(crate) fn new(
+        resource_type: Resource,
+        resource_name: &'n str,
+        size_requested_per_file_bytes: u64,
+        log_types: Vec<LogType>,
+        redacted: bool,
+        log_collection_from_date: Option<DateTime<Utc>>,
+        log_collection_to_date: Option<DateTime<Utc>>,
+    ) -> Self {
+        Self {
+            resource_type,
+            resource_name,
+            size_requested_per_file_bytes,
+            log_types,
+            redacted,
+            log_collection_from_date,
+            log_collection_to_date,
+        }
+    }
 }
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct CreatedJob {
-    id: String,
+    pub id: String,
 }
 
 #[derive(Debug, Deserialize)]
-#[allow(dead_code)]
 pub(crate) struct Job {
-    id: String,
-    status: JobStatus,
-    resource_type: Resource,
-    resource_name: String,
-    creation_date: DateTime<Utc>,
-    expiration_date: DateTime<Utc>,
-    log_types: Vec<LogType>,
-    redacted: bool,
-    size_requested_per_file_bytes: u64,
-    uncompressed_size_total_bytes: u64,
-    log_collection_from_date: Option<DateTime<Utc>>,
-    log_collection_to_date: Option<DateTime<Utc>>,
+    pub id: String,
+    pub status: JobStatus,
+    pub resource_type: Resource,
+    pub resource_name: String,
+    pub creation_date: DateTime<Utc>,
+    pub expiration_date: DateTime<Utc>,
+    pub log_types: Vec<LogType>,
+    pub redacted: bool,
+    pub size_requested_per_file_bytes: u64,
+    pub uncompressed_size_total_bytes: u64,
+    pub log_collection_from_date: Option<DateTime<Utc>>,
+    pub log_collection_to_date: Option<DateTime<Utc>>,
 }
 
-#[derive(Debug, Deserialize)]
+impl Display for Job {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "Server job:")?;
+        writeln!(f, "id: {id}", id = self.id)?;
+        writeln!(f, "status: {status}", status = self.status)?;
+
+        writeln!(
+            f,
+            "resource: {name} {rtype}",
+            name = self.resource_name,
+            rtype = self.resource_type
+        )?;
+
+        writeln!(f, "created at {date}", date = self.creation_date)?;
+        writeln!(f, "expires at {date}", date = self.expiration_date)?;
+
+        let logs = self
+            .log_types
+            .iter()
+            .map(|t| t.to_string())
+            .collect::<Vec<_>>()
+            .join(",");
+
+        writeln!(f, "requested logs: {logs}")?;
+        writeln!(f, "redacted: {redacted}", redacted = self.redacted)?;
+
+        if let Some(from_date) = self.log_collection_from_date {
+            writeln!(f, "created at {from_date}")?;
+        }
+
+        if let Some(to_date) = self.log_collection_to_date {
+            writeln!(f, "created at {to_date}")?;
+        }
+
+        writeln!(
+            f,
+            "requested {bytes} bytes per file",
+            bytes = self.size_requested_per_file_bytes
+        )?;
+
+        writeln!(
+            f,
+            "total uncompressed {bytes} bytes",
+            bytes = self.uncompressed_size_total_bytes
+        )?;
+
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Copy, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub(crate) enum JobStatus {
     Success,
@@ -188,6 +290,18 @@ pub(crate) enum JobStatus {
     InProgress,
     MarkedForExpiry,
     Expired,
+}
+
+impl Display for JobStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match *self {
+            JobStatus::Success => write!(f, "success"),
+            JobStatus::Failure => write!(f, "failure"),
+            JobStatus::InProgress => write!(f, "in progress"),
+            JobStatus::MarkedForExpiry => write!(f, "marked for expiry"),
+            JobStatus::Expired => write!(f, "expired"),
+        }
+    }
 }
 
 trait DigestAuth {

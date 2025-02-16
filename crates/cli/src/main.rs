@@ -11,8 +11,10 @@ use mprobe::vis::layout::VisLayout;
 
 use crate::cli::Cli;
 use crate::cli::Commands;
+use crate::error::CliError;
+use crate::fetch::fetch;
 
-fn main() {
+fn main() -> Result<(), CliError> {
     let cli = Cli::parse();
 
     match cli.command {
@@ -43,7 +45,9 @@ fn main() {
                 VisLayout::init(&output_path).expect("initializing data vis directory failed");
             vis.generate_report(diagnostic_data)
                 .expect("generating vis report failed");
+
+            Ok(())
         }
-        Commands::Fetch(fetch_args) => todo!(),
+        Commands::Fetch(args) => Ok(fetch(args)?),
     }
 }
