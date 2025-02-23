@@ -1,6 +1,6 @@
-use mprobe::diagnostics::DiagnosticData;
-use mprobe::diagnostics::MetricsFilter;
-use mprobe::vis::layout::VisLayout;
+use mprobe_diagnostics::DiagnosticData;
+use mprobe_diagnostics::MetricsFilter;
+use mprobe_vis::layout::VisLayout;
 
 use crate::cli::PathExt;
 use crate::cli::ViewArgs;

@@ -16,9 +16,10 @@ include = [
 ]
 
 [dependencies]
-mprobe = { path = "../mprobe", version = "0.1.0" }
-clap = { version = "4.5.28", features = ["derive"] }
+mprobe-diagnostics = { path = "../diagnostics", version = "0.1.0" }
+mprobe-vis = { path = "../vis", version = "0.1.0" }
 
+clap = { version = "4.5.28", features = ["derive"] }
 chrono = { version = "0.4.38", features = ["serde"]}
 reqwest = { version = "0.12.12", features = ["blocking", "json", "rustls-tls"] }
 serde = { version = "1.0", features = ["derive"] }

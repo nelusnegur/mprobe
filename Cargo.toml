@@ -1,6 +1,5 @@
 [workspace]
 members = [
-    "crates/mprobe",
     "crates/diagnostics",
     "crates/vis",
     "crates/cli",
