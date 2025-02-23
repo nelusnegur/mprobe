@@ -52,6 +52,8 @@ pub(crate) struct MetricsFetch {
 }
 
 impl MetricsFetch {
+    const ARCHIVE_NAME: &'static str = "diagnostic_data.tar.gz";
+
     pub fn new(
         client: LogClient,
         path: PathBuf,
@@ -61,6 +63,8 @@ impl MetricsFetch {
         to: Option<DateTime<Utc>>,
         redacted: bool,
     ) -> Self {
+        let path = path.join(Self::ARCHIVE_NAME);
+
         Self {
             client,
             path,
