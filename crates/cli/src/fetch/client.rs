@@ -28,7 +28,7 @@ pub(crate) struct LogClient {
 
 impl LogClient {
     pub fn new(group_id: Rc<str>, credentials: Credentials) -> Self {
-        let base_url = "https://cloud.mongodb.com/api/public/v1.0";
+        let base_url = "https://cloud.mongodb.com/api/atlas/v1.0";
         let client = Client::new();
 
         Self {
@@ -217,9 +217,12 @@ pub(crate) struct CreatedJob {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub(crate) struct Job {
     pub id: String,
     pub status: JobStatus,
+    pub root_resource_type: Resource,
+    pub root_resource_name: String,
     pub resource_type: Resource,
     pub resource_name: String,
     pub creation_date: DateTime<Utc>,
@@ -234,7 +237,7 @@ pub(crate) struct Job {
 
 impl Display for Job {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "Server job:")?;
+        writeln!(f, "Server job")?;
         writeln!(f, "id: {id}", id = self.id)?;
         writeln!(f, "status: {status}", status = self.status)?;
 
@@ -243,6 +246,13 @@ impl Display for Job {
             "resource: {name} {rtype}",
             name = self.resource_name,
             rtype = self.resource_type
+        )?;
+
+        writeln!(
+            f,
+            "root resource: {name} {rtype}",
+            name = self.root_resource_name,
+            rtype = self.root_resource_type
         )?;
 
         writeln!(f, "created at {date}", date = self.creation_date)?;
@@ -272,11 +282,13 @@ impl Display for Job {
             bytes = self.size_requested_per_file_bytes
         )?;
 
-        writeln!(
-            f,
-            "total uncompressed {bytes} bytes",
-            bytes = self.uncompressed_size_total_bytes
-        )?;
+        if self.uncompressed_size_total_bytes > 0 {
+            writeln!(
+                f,
+                "total uncompressed {bytes} bytes",
+                bytes = self.uncompressed_size_total_bytes
+            )?;
+        }
 
         Ok(())
     }
