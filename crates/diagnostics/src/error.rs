@@ -32,16 +32,9 @@ pub enum MetricsDecoderError {
     /// match.
     MetricsCountMismatch,
 
-    /// The collector type could not be extracted from the metric name.
-    MetricCollectorNotFound,
-
-    /// The metric with the specified name could not be found.
+    /// The metric timestamps for the given metric are missing.
     #[non_exhaustive]
-    MetricNotFound { name: String },
-
-    /// The metric with the specified name does not contain any value.
-    #[non_exhaustive]
-    MetricValueNotFound { name: String },
+    MetricTimestampNotFound { name: String },
 
     /// A [`TryFromIntError`] encountered while converting integer values from [`i32`] to
     /// [`usize`].
@@ -57,11 +50,7 @@ impl Display for MetricsDecoderError {
             MetricsDecoderError::MetricsCountMismatch => f.write_str(
                 "metrics count from the reference document and metrics count from samples do not match"
             ),
-            MetricsDecoderError::MetricCollectorNotFound => f.write_str(
-                "collector type could not be extracted from the metric name"
-            ),
-            MetricsDecoderError::MetricNotFound { name } => write!(f, "\"{}\" metric not found", name),
-            MetricsDecoderError::MetricValueNotFound { name } => write!(f, "there are no values for \"{}\" metric", name),
+            MetricsDecoderError::MetricTimestampNotFound { name } => write!(f, "the metric timestamps for the \"{}\" metric could not be found", name),
             MetricsDecoderError::IntConversion(inner) => Display::fmt(inner, f),
             MetricsDecoderError::UnknownDocumentKind(value) => write!(f, "Unknonw document type value: {value}"),
         }
@@ -75,9 +64,7 @@ impl Error for MetricsDecoderError {
             MetricsDecoderError::BsonDeserialzation(inner) => Some(inner),
             MetricsDecoderError::KeyValueAccess(inner) => Some(inner),
             MetricsDecoderError::MetricsCountMismatch => None,
-            MetricsDecoderError::MetricCollectorNotFound => None,
-            MetricsDecoderError::MetricNotFound { .. } => None,
-            MetricsDecoderError::MetricValueNotFound { .. } => None,
+            MetricsDecoderError::MetricTimestampNotFound { .. } => None,
             MetricsDecoderError::IntConversion(inner) => Some(inner),
             MetricsDecoderError::UnknownDocumentKind(_) => None,
         }

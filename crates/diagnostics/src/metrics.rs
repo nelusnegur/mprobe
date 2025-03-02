@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::fmt::Display;
 use std::io;
 use std::io::{Cursor, Read};
@@ -12,11 +11,6 @@ use crate::bytes;
 use crate::compression;
 use crate::error::MetricsDecoderError;
 use crate::metadata::Metadata;
-
-const METRIC_NAME_DELIMITER: char = ' ';
-
-const START_TIMESTAMP_METRIC_NAME: &str = "start";
-const END_TIMESTAMP_METRIC_NAME: &str = "end";
 
 #[derive(Debug, Clone)]
 pub struct MetricsChunk {
@@ -131,6 +125,9 @@ impl RawMetric {
 // }
 
 impl MetricsChunk {
+    const METRIC_NAME_DELIMITER: &str = " ";
+    const START_TIMESTAMP_METRIC_NAME: &str = "start";
+
     pub(crate) fn from_reader<R: Read + ?Sized>(
         reader: &mut R,
     ) -> Result<MetricsChunk, MetricsDecoderError> {
@@ -323,147 +320,69 @@ impl MetricsChunk {
         metrics: Vec<(Vec<String>, ValueType, Vec<u64>)>,
         reference_doc: &Document,
     ) -> Result<MetricsChunk, MetricsDecoderError> {
-        let mut start_timestamp_metrics: HashMap<String, Vec<DateTime<Utc>>> = HashMap::new();
-        let mut end_timestamp_metrics: HashMap<String, Vec<DateTime<Utc>>> = HashMap::new();
+        let mut metrics_chunk: Vec<Metric> = Vec::with_capacity(metrics.len());
+        let mut chunk_timestamps: Vec<DateTime<Utc>> = Vec::new();
+        let mut timestamps: Vec<DateTime<Utc>> = Vec::new();
 
-        for (name_parts, _, values) in metrics.iter() {
-            if let Some(name) = name_parts.last() {
-                if name == START_TIMESTAMP_METRIC_NAME {
-                    let name = if name_parts.len() == 1 {
-                        name.to_owned()
+        for (groups, ty, values) in metrics.into_iter() {
+            if let Some(name) = groups.last() {
+                if name == Self::START_TIMESTAMP_METRIC_NAME {
+                    let ts = to_timestamps(values).collect();
+
+                    if groups.len() == 1 {
+                        chunk_timestamps = ts;
                     } else {
-                        let first = name_parts.first().expect("name parts to be non empty");
-                        metric_name(first, START_TIMESTAMP_METRIC_NAME)
+                        timestamps = ts;
                     };
 
-                    start_timestamp_metrics.insert(
-                        name,
-                        values
-                            .iter()
-                            .map(|v| {
-                                Utc.timestamp_millis_opt(*v as i64)
-                                    .single()
-                                    .expect("timestamp to be converted to UTC")
-                            })
-                            .collect(),
-                    );
-                } else if name == END_TIMESTAMP_METRIC_NAME {
-                    let name = if name_parts.len() == 1 {
-                        name.to_owned()
-                    } else {
-                        let first = name_parts.first().expect("name parts to be non empty");
-                        metric_name(first, END_TIMESTAMP_METRIC_NAME)
-                    };
-
-                    end_timestamp_metrics.insert(
-                        name,
-                        values
-                            .iter()
-                            .map(|v| {
-                                Utc.timestamp_millis_opt(*v as i64)
-                                    .single()
-                                    .expect("timestamp to be converted to UTC")
-                            })
-                            .collect(),
-                    );
+                    continue;
                 }
             }
-        }
 
-        let mut metric_chunks: Vec<Metric> = Vec::with_capacity(
-            metrics.len() - start_timestamp_metrics.len() - end_timestamp_metrics.len(),
-        );
-
-        let metrics_without_timestamps = metrics.iter().filter(|(m, _, _)| {
-            m.last()
-                .filter(|n| n.ends_with(START_TIMESTAMP_METRIC_NAME))
-                .is_none()
-                && m.last()
-                    .filter(|n| n.ends_with(END_TIMESTAMP_METRIC_NAME))
-                    .is_none()
-        });
-
-        for (metric, ty, values) in metrics_without_timestamps {
-            // TODO: Use METRIC_NAME_DELIMITER constant
-            let name: String = metric.join(" ");
-
-            let collector = metric.first().expect("vector to not be empty");
-            // .split(METRIC_NAME_DELIMITER)
-            // .nth(1)
-            // .ok_or(MetricsDecoderError::MetricCollectorNotFound)?;
-            // let collector = metric_name("", collector);
-
-            let start_metric_name = metric_name(collector, START_TIMESTAMP_METRIC_NAME);
-            let end_metric_name = metric_name(collector, END_TIMESTAMP_METRIC_NAME);
-
-            let start_timestamp_values = start_timestamp_metrics
-                .get(start_metric_name.as_str())
-                .ok_or_else(|| MetricsDecoderError::MetricNotFound {
-                    name: start_metric_name.clone(),
-                })?;
-            let end_timestamp_values = end_timestamp_metrics
-                .get(end_metric_name.as_str())
-                .ok_or_else(|| MetricsDecoderError::MetricNotFound {
-                    name: end_metric_name.clone(),
-                })?;
-
-            let measurements = start_timestamp_values
+            let name: String = groups.join(Self::METRIC_NAME_DELIMITER);
+            let measurements = timestamps
                 .iter()
                 .zip(values)
                 .map(|(start, value)| Measurement {
                     timestamp: start.to_owned(),
-                    value: ty.convert(*value),
+                    value: ty.convert(value),
                 })
                 .collect::<Vec<Measurement>>();
 
-            let start_date =
-                start_timestamp_values
-                    .first()
-                    .ok_or(MetricsDecoderError::MetricValueNotFound {
-                        name: start_metric_name,
-                    })?;
+            let ts_err = || MetricsDecoderError::MetricTimestampNotFound { name: name.clone() };
+            let start_date = timestamps.first().ok_or_else(ts_err)?.to_owned();
+            let end_date = timestamps.last().ok_or_else(ts_err)?.to_owned();
 
-            let end_date =
-                end_timestamp_values
-                    .last()
-                    .ok_or(MetricsDecoderError::MetricValueNotFound {
-                        name: end_metric_name,
-                    })?;
-
-            metric_chunks.push(Metric {
+            metrics_chunk.push(Metric {
                 name,
-                // TODO: See if we can get rid of cloning here
-                groups: metric.clone(),
-                start_date: start_date.to_owned(),
-                end_date: end_date.to_owned(),
+                groups,
+                start_date,
+                end_date,
                 measurements,
             })
         }
 
-        let start_timestamp = start_timestamp_metrics
-            .get(START_TIMESTAMP_METRIC_NAME)
-            .and_then(|ts| ts.first())
-            .ok_or_else(|| MetricsDecoderError::MetricNotFound {
-                name: START_TIMESTAMP_METRIC_NAME.to_owned(),
-            })?;
-        let end_timestamp = end_timestamp_metrics
-            .get(END_TIMESTAMP_METRIC_NAME)
-            .and_then(|ts| ts.last())
-            .ok_or_else(|| MetricsDecoderError::MetricNotFound {
-                name: END_TIMESTAMP_METRIC_NAME.to_owned(),
-            })?;
+        let ts_err = || MetricsDecoderError::MetricTimestampNotFound {
+            name: Self::START_TIMESTAMP_METRIC_NAME.to_owned(),
+        };
+        let start_chunk = chunk_timestamps.first().ok_or_else(ts_err)?.to_owned();
+        let end_chunk = chunk_timestamps.last().ok_or_else(ts_err)?.to_owned();
 
         let metadata = Metadata::from_reference_document(reference_doc)?;
 
         Ok(MetricsChunk {
-            start_date: start_timestamp.to_owned(),
-            end_date: end_timestamp.to_owned(),
-            metrics: metric_chunks,
+            start_date: start_chunk,
+            end_date: end_chunk,
+            metrics: metrics_chunk,
             metadata,
         })
     }
 }
 
-fn metric_name(parent_key: &str, key: &str) -> String {
-    format!("{}{}{}", parent_key, METRIC_NAME_DELIMITER, key)
+fn to_timestamps(values: Vec<u64>) -> impl Iterator<Item = DateTime<Utc>> {
+    values.into_iter().map(|v| {
+        Utc.timestamp_millis_opt(v as i64)
+            .single()
+            .expect("timestamp to be converted to UTC")
+    })
 }
