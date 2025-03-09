@@ -1,11 +1,11 @@
 mod bson;
 mod bytes;
 mod compression;
+mod filter;
 mod iter;
 mod read;
 
 pub mod error;
-pub mod filter;
 pub mod metadata;
 pub mod metrics;
 
