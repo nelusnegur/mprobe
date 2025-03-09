@@ -11,7 +11,7 @@ use chrono::Utc;
 
 use crate::bytes;
 use crate::compression;
-use crate::error::MetricsDecoderError;
+use crate::error::MetricParseError;
 use crate::metadata::Metadata;
 use crate::metrics::raw::MetricParser;
 use crate::metrics::raw::RawMetric;
@@ -81,7 +81,7 @@ impl MetricsChunk {
 
     pub(crate) fn from_reader<R: Read + ?Sized>(
         reader: &mut R,
-    ) -> Result<MetricsChunk, MetricsDecoderError> {
+    ) -> Result<MetricsChunk, MetricParseError> {
         let data = compression::decompress(reader)?;
         let mut cursor = Cursor::new(data.as_slice());
 
@@ -97,7 +97,7 @@ impl MetricsChunk {
     fn from_raw(
         metrics: Vec<RawMetric>,
         reference_doc: &Document,
-    ) -> Result<MetricsChunk, MetricsDecoderError> {
+    ) -> Result<MetricsChunk, MetricParseError> {
         let mut metrics_chunk: Vec<Metric> = Vec::with_capacity(metrics.len());
         let mut chunk_timestamps: Vec<DateTime<Utc>> = Vec::new();
         let mut timestamps: Vec<DateTime<Utc>> = Vec::new();
@@ -127,7 +127,7 @@ impl MetricsChunk {
                 })
                 .collect::<Vec<Measurement>>();
 
-            let ts_err = || MetricsDecoderError::MetricTimestampNotFound { name: name.clone() };
+            let ts_err = || MetricParseError::MetricTimestampNotFound { name: name.clone() };
             let start_date = timestamps.first().ok_or_else(ts_err)?.to_owned();
             let end_date = timestamps.last().ok_or_else(ts_err)?.to_owned();
 
@@ -140,7 +140,7 @@ impl MetricsChunk {
             })
         }
 
-        let ts_err = || MetricsDecoderError::MetricTimestampNotFound {
+        let ts_err = || MetricParseError::MetricTimestampNotFound {
             name: Self::START_TIMESTAMP_METRIC_NAME.to_owned(),
         };
         let start_chunk = chunk_timestamps.first().ok_or_else(ts_err)?.to_owned();

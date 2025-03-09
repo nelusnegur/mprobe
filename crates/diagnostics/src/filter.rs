@@ -7,7 +7,7 @@ use chrono::Utc;
 
 use crate::bson::DocumentKind;
 use crate::bson::ReadDocument;
-use crate::error::MetricsDecoderError;
+use crate::error::MetricParseError;
 
 #[derive(Debug, Default)]
 pub(crate) struct TimeWindow {
@@ -56,7 +56,7 @@ pub(crate) struct TimeWindowFilter<I> {
 
 impl<I> TimeWindowFilter<I>
 where
-    I: Iterator<Item = Result<Document, MetricsDecoderError>>,
+    I: Iterator<Item = Result<Document, MetricParseError>>,
 {
     pub fn new(iter: I, time_window: Rc<TimeWindow>) -> Self {
         Self {
@@ -69,9 +69,9 @@ where
 
 impl<I> Iterator for TimeWindowFilter<I>
 where
-    I: Iterator<Item = Result<Document, MetricsDecoderError>>,
+    I: Iterator<Item = Result<Document, MetricParseError>>,
 {
-    type Item = Result<Document, MetricsDecoderError>;
+    type Item = Result<Document, MetricParseError>;
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {
@@ -109,9 +109,9 @@ impl<I> HostnameFilter<I> {
 
 impl<I> Iterator for HostnameFilter<I>
 where
-    I: Iterator<Item = Result<Document, MetricsDecoderError>>,
+    I: Iterator<Item = Result<Document, MetricParseError>>,
 {
-    type Item = Result<Document, MetricsDecoderError>;
+    type Item = Result<Document, MetricParseError>;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {

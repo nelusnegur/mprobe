@@ -16,7 +16,7 @@ use chrono::Utc;
 
 use crate::bson::DocumentKind;
 use crate::bson::ReadDocument;
-use crate::error::MetricsDecoderError;
+use crate::error::MetricParseError;
 use crate::filter::HostnameFilter;
 use crate::filter::TimeWindow;
 use crate::filter::TimeWindowFilter;
@@ -29,7 +29,7 @@ use crate::MetricsFilter;
 /// and yields [`MetricsChunk`] elements.
 #[must_use = "iterators are lazy and do nothing unless consumed"]
 pub struct MetricsIterator {
-    metric_chunks: Box<dyn Iterator<Item = Result<MetricsChunk, MetricsDecoderError>>>,
+    metric_chunks: Box<dyn Iterator<Item = Result<MetricsChunk, MetricParseError>>>,
 }
 
 impl MetricsIterator {
@@ -59,7 +59,7 @@ impl MetricsIterator {
 }
 
 impl Iterator for MetricsIterator {
-    type Item = Result<MetricsChunk, MetricsDecoderError>;
+    type Item = Result<MetricsChunk, MetricParseError>;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
@@ -307,7 +307,7 @@ impl<I> Iterator for FileReader<I>
 where
     I: Iterator<Item = Result<FileInfo, io::Error>>,
 {
-    type Item = Result<Document, MetricsDecoderError>;
+    type Item = Result<Document, MetricParseError>;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
@@ -315,14 +315,14 @@ where
             match self.inner_iter {
                 Some(ref mut inner_iter) => match inner_iter.next() {
                     None => self.inner_iter = None,
-                    item => return item.map(|i| i.map_err(MetricsDecoderError::from)),
+                    item => return item.map(|i| i.map_err(MetricParseError::from)),
                 },
                 None => match self.iter.next()? {
                     Ok(fi) => match File::open(fi.path) {
                         Ok(file) => self.inner_iter = Some(BsonReader::new(file)),
-                        Err(err) => return Some(Err(MetricsDecoderError::from(err))),
+                        Err(err) => return Some(Err(MetricParseError::from(err))),
                     },
-                    Err(err) => return Some(Err(MetricsDecoderError::from(err))),
+                    Err(err) => return Some(Err(MetricParseError::from(err))),
                 },
             }
         }
@@ -364,7 +364,7 @@ struct MetricsChunkReader<I> {
 
 impl<I> MetricsChunkReader<I>
 where
-    I: Iterator<Item = Result<Document, MetricsDecoderError>>,
+    I: Iterator<Item = Result<Document, MetricParseError>>,
 {
     pub fn new(iter: I) -> Self {
         Self { iter }
@@ -373,9 +373,9 @@ where
 
 impl<I: Iterator> Iterator for MetricsChunkReader<I>
 where
-    I: Iterator<Item = Result<Document, MetricsDecoderError>>,
+    I: Iterator<Item = Result<Document, MetricParseError>>,
 {
-    type Item = Result<MetricsChunk, MetricsDecoderError>;
+    type Item = Result<MetricsChunk, MetricParseError>;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {

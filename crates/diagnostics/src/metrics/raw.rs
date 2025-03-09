@@ -8,7 +8,7 @@ use chrono::TimeZone;
 use chrono::Utc;
 
 use crate::bytes;
-use crate::error::MetricsDecoderError;
+use crate::error::MetricParseError;
 use crate::metrics::MetricValue;
 
 pub(super) struct MetricParser;
@@ -19,7 +19,7 @@ impl MetricParser {
         data: &mut Cursor<&[u8]>,
         metrics_count: usize,
         samples_count: usize,
-    ) -> Result<Vec<RawMetric>, MetricsDecoderError> {
+    ) -> Result<Vec<RawMetric>, MetricParseError> {
         let init_values = Self::read_initial_values(reference_doc, metrics_count)?;
         let metrics = Self::read_samples(data, init_values, samples_count)?;
 
@@ -29,13 +29,13 @@ impl MetricParser {
     fn read_initial_values(
         reference_doc: &Document,
         metrics_count: usize,
-    ) -> Result<Vec<MetricInitVal>, MetricsDecoderError> {
+    ) -> Result<Vec<MetricInitVal>, MetricParseError> {
         let mut metrics: Vec<MetricInitVal> = Vec::with_capacity(metrics_count);
 
         Self::select_metrics(reference_doc, Vec::new(), &mut metrics);
 
         if metrics.len() != metrics_count {
-            return Err(MetricsDecoderError::MetricsCountMismatch);
+            return Err(MetricParseError::MetricsCountMismatch);
         }
 
         Ok(metrics)

@@ -17,7 +17,7 @@ use std::path::Path;
 use chrono::DateTime;
 use chrono::Utc;
 
-use crate::error::MetricsDecoderError;
+use crate::error::MetricParseError;
 use crate::metrics::MetricsChunk;
 use crate::read::MetricsIterator;
 
@@ -52,7 +52,7 @@ impl<'a> DiagnosticData<'a> {
 }
 
 impl IntoIterator for DiagnosticData<'_> {
-    type Item = Result<MetricsChunk, MetricsDecoderError>;
+    type Item = Result<MetricsChunk, MetricParseError>;
 
     type IntoIter = MetricsIterator;
 

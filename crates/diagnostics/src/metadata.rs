@@ -1,6 +1,6 @@
 use bson::Document;
 
-use crate::error::KeyValueAccessError;
+use crate::error::KeyAccessError;
 use crate::error::ValueAccessResultExt;
 
 const SERVER_STATUS_KEY: &str = "serverStatus";
@@ -16,7 +16,7 @@ pub struct Metadata {
 }
 
 impl Metadata {
-    pub(crate) fn from_reference_document(doc: &Document) -> Result<Metadata, KeyValueAccessError> {
+    pub(crate) fn from_reference_document(doc: &Document) -> Result<Metadata, KeyAccessError> {
         let server_status = doc
             .get_document(SERVER_STATUS_KEY)
             .map_value_access_err(SERVER_STATUS_KEY)?;

@@ -2,7 +2,7 @@ use bson::Document;
 use chrono::DateTime;
 use chrono::Utc;
 
-use crate::error::MetricsDecoderError;
+use crate::error::MetricParseError;
 use crate::error::ValueAccessResultExt;
 
 const ID_KEY: &str = "_id";
@@ -23,41 +23,41 @@ pub(crate) enum DocumentKind {
 }
 
 impl TryFrom<i32> for DocumentKind {
-    type Error = MetricsDecoderError;
+    type Error = MetricParseError;
 
     fn try_from(value: i32) -> Result<Self, Self::Error> {
         match value {
             0 => Ok(DocumentKind::Metadata),
             1 => Ok(DocumentKind::MetricsChunk),
             2 => Ok(DocumentKind::PeriodicMetadata),
-            val => Err(MetricsDecoderError::UnknownDocumentKind(val)),
+            val => Err(MetricParseError::UnknownDocumentKind(val)),
         }
     }
 }
 
 pub(crate) trait ReadDocument {
-    fn kind(&self) -> Result<DocumentKind, MetricsDecoderError>;
-    fn timestamp(&self) -> Result<DateTime<Utc>, MetricsDecoderError>;
-    fn hostname(&self) -> Result<&str, MetricsDecoderError>;
-    fn metrics_chunk(&self) -> Result<&Vec<u8>, MetricsDecoderError>;
+    fn kind(&self) -> Result<DocumentKind, MetricParseError>;
+    fn timestamp(&self) -> Result<DateTime<Utc>, MetricParseError>;
+    fn hostname(&self) -> Result<&str, MetricParseError>;
+    fn metrics_chunk(&self) -> Result<&Vec<u8>, MetricParseError>;
 }
 
 impl ReadDocument for Document {
-    fn kind(&self) -> Result<DocumentKind, MetricsDecoderError> {
+    fn kind(&self) -> Result<DocumentKind, MetricParseError> {
         self.get_i32(DATA_TYPE_KEY)
             .map_value_access_err(DATA_TYPE_KEY)
-            .map_err(MetricsDecoderError::from)
+            .map_err(MetricParseError::from)
             .and_then(|dt| dt.try_into())
     }
 
-    fn timestamp(&self) -> Result<DateTime<Utc>, MetricsDecoderError> {
+    fn timestamp(&self) -> Result<DateTime<Utc>, MetricParseError> {
         self.get_datetime(ID_KEY)
             .map_value_access_err(ID_KEY)
             .map(|ts| ts.to_chrono())
-            .map_err(MetricsDecoderError::from)
+            .map_err(MetricParseError::from)
     }
 
-    fn hostname(&self) -> Result<&str, MetricsDecoderError> {
+    fn hostname(&self) -> Result<&str, MetricParseError> {
         let metadata = self
             .get_document(METADATA_KEY)
             .map_value_access_err(METADATA_KEY)?;
@@ -77,7 +77,7 @@ impl ReadDocument for Document {
         Ok(hostname)
     }
 
-    fn metrics_chunk(&self) -> Result<&Vec<u8>, MetricsDecoderError> {
+    fn metrics_chunk(&self) -> Result<&Vec<u8>, MetricParseError> {
         let data = self
             .get_binary_generic(METRICS_CHUNK_KEY)
             .map_value_access_err(METRICS_CHUNK_KEY)?;

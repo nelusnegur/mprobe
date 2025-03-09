@@ -10,20 +10,19 @@ use std::sync::Arc;
 use bson::de;
 use bson::document::ValueAccessError;
 
-/// The error type for decoding diagnostic metrics.
+/// The error type for parsing diagnostic metrics.
 ///
 /// Errors mostly originate from I/O read operations, BSON deserialization and field value accesses.
 #[derive(Debug, Clone)]
-#[non_exhaustive]
-pub enum MetricsDecoderError {
+pub enum MetricParseError {
     /// A [`std::io::Error`] encountered while reading metric chunks.
     Io(Arc<io::Error>),
 
     /// A [`bson::de::Error`] encountered while deserializing BSON documents.
     BsonDeserialzation(de::Error),
 
-    /// A [`KeyValueAccessError`] encountered while accessing BSON fields.
-    KeyValueAccess(KeyValueAccessError),
+    /// A [`KeyAccessError`] encountered while accessing BSON fields.
+    FieldAccess(KeyAccessError),
 
     /// Unknown document type.
     UnknownDocumentKind(i32),
@@ -33,7 +32,6 @@ pub enum MetricsDecoderError {
     MetricsCountMismatch,
 
     /// The metric timestamps for the given metric are missing.
-    #[non_exhaustive]
     MetricTimestampNotFound { name: String },
 
     /// A [`TryFromIntError`] encountered while converting integer values from [`i32`] to
@@ -41,92 +39,91 @@ pub enum MetricsDecoderError {
     IntConversion(TryFromIntError),
 }
 
-impl Display for MetricsDecoderError {
+impl Display for MetricParseError {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let parse_error = "metric parse error:";
+
         match self {
-            MetricsDecoderError::Io(inner) => Display::fmt(inner, f),
-            MetricsDecoderError::BsonDeserialzation(inner) => Display::fmt(inner, f),
-            MetricsDecoderError::KeyValueAccess(inner) => Display::fmt(inner, f),
-            MetricsDecoderError::MetricsCountMismatch => f.write_str(
-                "metrics count from the reference document and metrics count from samples do not match"
+            MetricParseError::Io(error) => write!(f, "{parse_error} I/O error: {error}"),
+            MetricParseError::BsonDeserialzation(error) => write!(f, "{parse_error} BSON deserialization error: {error}"),
+            MetricParseError::FieldAccess(error) => write!(f, "{parse_error} could not read the document field: {error}"),
+            MetricParseError::MetricsCountMismatch => write!(f,
+                "{parse_error} metrics count from the reference document and metrics count from samples do not match"
             ),
-            MetricsDecoderError::MetricTimestampNotFound { name } => write!(f, "the metric timestamps for the \"{}\" metric could not be found", name),
-            MetricsDecoderError::IntConversion(inner) => Display::fmt(inner, f),
-            MetricsDecoderError::UnknownDocumentKind(value) => write!(f, "Unknonw document type value: {value}"),
+            MetricParseError::MetricTimestampNotFound { name } => write!(f, "{parse_error} the metric timestamps for the \"{}\" metric could not be found", name),
+            MetricParseError::IntConversion(error) => write!(f, "{parse_error} could not parse integer: {error}"),
+            MetricParseError::UnknownDocumentKind(value) => write!(f, "{parse_error} unknonw document type: {value}"),
         }
     }
 }
 
-impl Error for MetricsDecoderError {
+impl Error for MetricParseError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
-            MetricsDecoderError::Io(inner) => Some(inner),
-            MetricsDecoderError::BsonDeserialzation(inner) => Some(inner),
-            MetricsDecoderError::KeyValueAccess(inner) => Some(inner),
-            MetricsDecoderError::MetricsCountMismatch => None,
-            MetricsDecoderError::MetricTimestampNotFound { .. } => None,
-            MetricsDecoderError::IntConversion(inner) => Some(inner),
-            MetricsDecoderError::UnknownDocumentKind(_) => None,
+            MetricParseError::Io(error) => Some(error),
+            MetricParseError::BsonDeserialzation(error) => Some(error),
+            MetricParseError::FieldAccess(error) => Some(error),
+            MetricParseError::MetricsCountMismatch => None,
+            MetricParseError::MetricTimestampNotFound { .. } => None,
+            MetricParseError::IntConversion(error) => Some(error),
+            MetricParseError::UnknownDocumentKind(_) => None,
         }
     }
 }
 
-impl From<io::Error> for MetricsDecoderError {
+impl From<io::Error> for MetricParseError {
     fn from(error: io::Error) -> Self {
-        MetricsDecoderError::Io(Arc::new(error))
+        MetricParseError::Io(Arc::new(error))
     }
 }
 
-impl From<de::Error> for MetricsDecoderError {
+impl From<de::Error> for MetricParseError {
     fn from(error: de::Error) -> Self {
-        MetricsDecoderError::BsonDeserialzation(error)
+        MetricParseError::BsonDeserialzation(error)
     }
 }
 
-impl From<TryFromIntError> for MetricsDecoderError {
+impl From<TryFromIntError> for MetricParseError {
     fn from(error: TryFromIntError) -> Self {
-        MetricsDecoderError::IntConversion(error)
+        MetricParseError::IntConversion(error)
     }
 }
 
-impl From<KeyValueAccessError> for MetricsDecoderError {
-    fn from(error: KeyValueAccessError) -> Self {
-        MetricsDecoderError::KeyValueAccess(error)
+impl From<KeyAccessError> for MetricParseError {
+    fn from(error: KeyAccessError) -> Self {
+        MetricParseError::FieldAccess(error)
     }
 }
 
 /// The error type for accessing BSON fields with the specified key.
 #[derive(Debug, Clone)]
-#[non_exhaustive]
-pub enum KeyValueAccessError {
+pub enum KeyAccessError {
     /// Could not find the field with the specified key.
-    #[non_exhaustive]
     KeyNotFound { key: String },
 
     /// The field with the specified key was found, but not with the expected type.
-    #[non_exhaustive]
     UnexpectedKeyType { key: String },
 
     /// Could not access field value with the specified key.
-    #[non_exhaustive]
     AccessError { key: String },
 }
 
-impl Display for KeyValueAccessError {
+impl Display for KeyAccessError {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let key_access_error = "key access error:";
         match *self {
-            KeyValueAccessError::KeyNotFound { ref key } => {
-                write!(f, "could not find the field with the \"{}\" key", key)
+            KeyAccessError::KeyNotFound { ref key } => {
+                write!(f, "{key_access_error} could not find the field with the \"{}\" key", key)
             }
-            KeyValueAccessError::UnexpectedKeyType { ref key } => write!(
+            KeyAccessError::UnexpectedKeyType { ref key } => write!(
                 f,
-                "the field with \"{}\" key was found, but not with the expected type",
+                "{key_access_error} the field with \"{}\" key was found, but not with the expected type",
                 key
             ),
-            KeyValueAccessError::AccessError { ref key } => {
+            KeyAccessError::AccessError { ref key } => {
                 write!(
                     f,
-                    "could not access the field value with the \"{}\" key",
+                    "{key_access_error} could not access the field value with the \"{}\" key",
                     key
                 )
             }
@@ -134,22 +131,22 @@ impl Display for KeyValueAccessError {
     }
 }
 
-impl Error for KeyValueAccessError {}
+impl Error for KeyAccessError {}
 
 pub(crate) trait ValueAccessResultExt<T> {
-    fn map_value_access_err(self, key: &str) -> Result<T, KeyValueAccessError>;
+    fn map_value_access_err(self, key: &str) -> Result<T, KeyAccessError>;
 }
 
 impl<T> ValueAccessResultExt<T> for Result<T, ValueAccessError> {
-    fn map_value_access_err(self, key: &str) -> Result<T, KeyValueAccessError> {
+    fn map_value_access_err(self, key: &str) -> Result<T, KeyAccessError> {
         self.map_err(|error| match error {
-            ValueAccessError::NotPresent => KeyValueAccessError::KeyNotFound {
+            ValueAccessError::NotPresent => KeyAccessError::KeyNotFound {
                 key: key.to_owned(),
             },
-            ValueAccessError::UnexpectedType => KeyValueAccessError::UnexpectedKeyType {
+            ValueAccessError::UnexpectedType => KeyAccessError::UnexpectedKeyType {
                 key: key.to_owned(),
             },
-            _ => KeyValueAccessError::AccessError {
+            _ => KeyAccessError::AccessError {
                 key: key.to_owned(),
             },
         })

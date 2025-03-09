@@ -1,4 +1,4 @@
-use mprobe_diagnostics::error::MetricsDecoderError;
+use mprobe_diagnostics::error::MetricParseError;
 use mprobe_diagnostics::metrics::MetricsChunk;
 
 pub(super) struct ErrorHandlingIter<I> {
@@ -7,7 +7,7 @@ pub(super) struct ErrorHandlingIter<I> {
 
 impl<I> ErrorHandlingIter<I>
 where
-    I: Iterator<Item = Result<MetricsChunk, MetricsDecoderError>>,
+    I: Iterator<Item = Result<MetricsChunk, MetricParseError>>,
 {
     pub fn new(iter: I) -> ErrorHandlingIter<I> {
         Self { iter }
@@ -16,7 +16,7 @@ where
 
 impl<I> Iterator for ErrorHandlingIter<I>
 where
-    I: Iterator<Item = Result<MetricsChunk, MetricsDecoderError>>,
+    I: Iterator<Item = Result<MetricsChunk, MetricParseError>>,
 {
     type Item = MetricsChunk;
 
