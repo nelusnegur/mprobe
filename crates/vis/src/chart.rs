@@ -9,15 +9,17 @@ use crate::id::Id;
 pub struct Chart {
     id: Id,
     name: String,
+    pub(crate) groups: Vec<String>,
     series: Arc<Series>,
     series_path: Arc<Path>,
 }
 
 impl Chart {
-    pub fn new(id: Id, name: String, series: Arc<Series>, series_path: Arc<Path>) -> Chart {
+    pub fn new(id: Id, name: String, groups: Vec<String>, series: Arc<Series>, series_path: Arc<Path>) -> Chart {
         Self {
             id,
             name,
+            groups,
             series,
             series_path,
         }

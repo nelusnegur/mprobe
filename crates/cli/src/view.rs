@@ -6,7 +6,6 @@ use crate::cli::PathExt;
 use crate::cli::ViewArgs;
 use crate::error::CliError;
 
-// TODO: Define View Error
 // TODO: Validate start_timestamp < end_timestamp, for fetch as well
 pub(crate) fn view(args: ViewArgs) -> Result<(), CliError> {
     let output_path = args.output_path.or_current_dir()?;

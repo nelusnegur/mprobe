@@ -56,7 +56,7 @@ impl<'a> SeriesGen<'a> {
                             .open(&file_path)?;
 
                         let chart =
-                            Chart::new(id, metric.name.clone(), Arc::clone(&series), file_path);
+                            Chart::new(id, metric.name.clone(), metric.groups, Arc::clone(&series), file_path);
                         charts.push(chart);
 
                         let mut writer = SeriesWriter::new(writer, Arc::clone(&series));
