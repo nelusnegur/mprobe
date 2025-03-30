@@ -116,12 +116,12 @@ impl<'a> TemplateEngine<'a> {
 
         for view in VIEWS.iter() {
             let charts: Vec<&Chart> = view.select(charts.iter()).collect();
-            let chart_context = ChartContext::new(charts);
+            let chart_context = ChartContext { charts };
             let charts = self
                 .templates
                 .render(CHARTS_TEMPLATE.name, &chart_context)?;
 
-            let view_context = ViewContext::new(charts);
+            let view_context = ViewContext { view: charts };
             let text = self.templates.render(VIEW_TEMPLATE.name, &view_context)?;
             self.create_view(view.file_name, &text)?;
         }
@@ -138,7 +138,7 @@ impl<'a> TemplateEngine<'a> {
             })
             .collect();
 
-        let context = IndexContext::new(views);
+        let context = IndexContext { views };
         let text = self.templates.render(INDEX_TEMPLATE.name, &context)?;
         self.create_file(self.index_path, &text)?;
 
@@ -169,32 +169,14 @@ struct ViewContext {
     view: String,
 }
 
-impl ViewContext {
-    pub fn new(view: String) -> ViewContext {
-        Self { view }
-    }
-}
-
 #[derive(Serialize)]
 struct ChartContext<'a> {
     charts: Vec<&'a Chart>,
 }
 
-impl<'a> ChartContext<'a> {
-    pub fn new(charts: Vec<&'a Chart>) -> ChartContext<'a> {
-        Self { charts }
-    }
-}
-
 #[derive(Serialize)]
 struct IndexContext {
     views: Vec<ViewItem>,
-}
-
-impl IndexContext {
-    pub fn new(views: Vec<ViewItem>) -> Self {
-        Self { views }
-    }
 }
 
 #[derive(Serialize)]
