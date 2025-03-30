@@ -1,5 +1,5 @@
-mod iter;
 mod data;
+mod iter;
 mod series;
 
 use std::fs;
@@ -9,8 +9,8 @@ use std::path::PathBuf;
 use mprobe_diagnostics::DiagnosticData;
 
 use crate::error::Result;
-use crate::layout::iter::ErrorHandlingIter;
 use crate::layout::data::DataEngine;
+use crate::layout::iter::ErrorHandlingIter;
 use crate::template::TemplateEngine;
 
 /// The data visualization directory is structured as follows:
@@ -31,7 +31,6 @@ use crate::template::TemplateEngine;
 /// The __data__ directory contains the chart data.
 /// The __view__ directory contains the chart visualizations.
 pub struct VisLayout {
-    root_path: PathBuf,
     index_file_path: PathBuf,
     views_path: PathBuf,
     data_path: PathBuf,
@@ -49,10 +48,12 @@ impl VisLayout {
         let data_path = root_path.join(Self::DATA_DIR_NAME);
         let views_path = root_path.join(Self::VIEWS_DIR_NAME);
 
+        if root_path.exists() {
+            fs::remove_dir_all(&root_path)?;
+        }
         fs::create_dir(&root_path)?;
 
         Ok(Self {
-            root_path,
             data_path,
             index_file_path,
             views_path,
