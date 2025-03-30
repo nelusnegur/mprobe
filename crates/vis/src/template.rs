@@ -14,7 +14,6 @@ struct Template {
     text: &'static str,
 }
 
-// TODO: Render the index template
 static INDEX_TEMPLATE: Template = Template {
     name: "index",
     text: include_str!("./template/index.html.tt"),
@@ -31,28 +30,34 @@ static VIEW_TEMPLATE: Template = Template {
 };
 
 struct View {
+    name: &'static str,
     groups: &'static [&'static str],
     file_name: &'static str,
 }
 
 static VIEWS: [View; 5] = [
     View {
+        name: "Server status",
         groups: &["serverStatus"],
         file_name: "server-status.html",
     },
     View {
+        name: "ReplicaSet status",
         groups: &["replSetGetStatus"],
         file_name: "replset-status.html",
     },
     View {
+        name: "WiredTiger",
         groups: &["serverStatus", "wiredTiger"],
         file_name: "wiredtiger.html",
     },
     View {
+        name: "Oplog",
         groups: &["local.oplog.rs.stats"],
         file_name: "oplog.html",
     },
     View {
+        name: "System metrics",
         groups: &["systemMetrics"],
         file_name: "system-metrics.html",
     },
@@ -107,6 +112,8 @@ impl<'a> TemplateEngine<'a> {
             fs::create_dir(self.views_path)?;
         }
 
+        self.render_index()?;
+
         for view in VIEWS.iter() {
             let charts: Vec<&Chart> = view.select(charts.iter()).collect();
             let chart_context = ChartContext::new(charts);
@@ -116,14 +123,34 @@ impl<'a> TemplateEngine<'a> {
 
             let view_context = ViewContext::new(charts);
             let text = self.templates.render(VIEW_TEMPLATE.name, &view_context)?;
-            self.create_file(view.file_name, &text)?;
+            self.create_view(view.file_name, &text)?;
         }
 
         Ok(())
     }
 
-    fn create_file(&self, name: &str, text: &str) -> Result<()> {
+    fn render_index(&self) -> Result<()> {
+        let views: Vec<ViewItem> = VIEWS
+            .iter()
+            .map(|v| ViewItem {
+                name: v.name,
+                file_name: v.file_name,
+            })
+            .collect();
+
+        let context = IndexContext::new(views);
+        let text = self.templates.render(INDEX_TEMPLATE.name, &context)?;
+        self.create_file(self.index_path, &text)?;
+
+        Ok(())
+    }
+
+    fn create_view(&self, name: &str, text: &str) -> Result<()> {
         let path = self.views_path.join(name);
+        self.create_file(&path, text)
+    }
+
+    fn create_file(&self, path: &Path, text: &str) -> Result<()> {
         let mut file = File::options()
             .create(true)
             .write(true)
@@ -157,4 +184,21 @@ impl<'a> ChartContext<'a> {
     pub fn new(charts: Vec<&'a Chart>) -> ChartContext<'a> {
         Self { charts }
     }
+}
+
+#[derive(Serialize)]
+struct IndexContext {
+    views: Vec<ViewItem>,
+}
+
+impl IndexContext {
+    pub fn new(views: Vec<ViewItem>) -> Self {
+        Self { views }
+    }
+}
+
+#[derive(Serialize)]
+struct ViewItem {
+    name: &'static str,
+    file_name: &'static str,
 }
