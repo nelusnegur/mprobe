@@ -9,91 +9,114 @@ use tinytemplate::TinyTemplate;
 use crate::chart::Chart;
 use crate::error::Result;
 
+struct Template {
+    name: &'static str,
+    text: &'static str,
+}
+
 // TODO: Render the index template
-static INDEX_TEMPLATE: TemplateInfo = TemplateInfo {
+static INDEX_TEMPLATE: Template = Template {
     name: "index",
-    groups: &[],
-    file_name: "index.html",
     text: include_str!("./template/index.html.tt"),
 };
 
-static TEMPLATES: [TemplateInfo; 5] = [
-    TemplateInfo {
-        name: "server-status",
-        groups: &["serverStatus"],
-        file_name: "server-status.html",
-        text: include_str!("./template/server-status.html.tt"),
-    },
-    TemplateInfo {
-        name: "replset-status",
-        file_name: "replset-status.html",
-        groups: &["replSetGetStatus"],
-        text: include_str!("./template/replset-status.html.tt"),
-    },
-    TemplateInfo {
-        name: "wiredtiger",
-        file_name: "wiredtiger.html",
-        groups: &["serverStatus", "wiredTiger"],
-        text: include_str!("./template/wiredtiger.html.tt"),
-    },
-    TemplateInfo {
-        name: "oplog",
-        groups: &["local.oplog.rs.stats"],
-        file_name: "oplog.html",
-        text: include_str!("./template/oplog.html.tt"),
-    },
-    TemplateInfo {
-        name: "system-metrics",
-        groups: &["systemMetrics"],
-        file_name: "system-metrics.html",
-        text: include_str!("./template/system-metrics.html.tt"),
-    },
-];
+static CHARTS_TEMPLATE: Template = Template {
+    name: "charts",
+    text: include_str!("./template/charts.html.tt"),
+};
 
-struct TemplateInfo {
-    name: &'static str,
-    text: &'static str,
+static VIEW_TEMPLATE: Template = Template {
+    name: "view",
+    text: include_str!("./template/view.html.tt"),
+};
+
+struct View {
     groups: &'static [&'static str],
     file_name: &'static str,
 }
 
-pub struct Template<'a> {
-    index_path: &'a Path,
-    views_path: &'a Path,
+static VIEWS: [View; 5] = [
+    View {
+        groups: &["serverStatus"],
+        file_name: "server-status.html",
+    },
+    View {
+        groups: &["replSetGetStatus"],
+        file_name: "replset-status.html",
+    },
+    View {
+        groups: &["serverStatus", "wiredTiger"],
+        file_name: "wiredtiger.html",
+    },
+    View {
+        groups: &["local.oplog.rs.stats"],
+        file_name: "oplog.html",
+    },
+    View {
+        groups: &["systemMetrics"],
+        file_name: "system-metrics.html",
+    },
+];
+
+impl View {
+    pub fn select<'c, I>(&self, charts: I) -> impl Iterator<Item = &'c Chart>
+    where
+        I: Iterator<Item = &'c Chart>,
+    {
+        charts.filter(|c| {
+            !self.groups.is_empty()
+                && self
+                    .groups
+                    .iter()
+                    .all(|g| c.groups.iter().any(|cg| cg == g))
+        })
+    }
 }
 
-impl<'a> Template<'a> {
-    pub fn new(index_path: &'a Path, views_path: &'a Path) -> Template<'a> {
+pub struct TemplateEngine<'a> {
+    index_path: &'a Path,
+    views_path: &'a Path,
+    templates: TinyTemplate<'static>,
+}
+
+impl<'a> TemplateEngine<'a> {
+    pub fn new(index_path: &'a Path, views_path: &'a Path) -> TemplateEngine<'a> {
+        let mut templates = TinyTemplate::new();
+
+        templates
+            .add_template(CHARTS_TEMPLATE.name, CHARTS_TEMPLATE.text)
+            .expect("parse and compile the charts template");
+
+        templates
+            .add_template(VIEW_TEMPLATE.name, VIEW_TEMPLATE.text)
+            .expect("parse and compile the view template");
+
+        templates
+            .add_template(INDEX_TEMPLATE.name, INDEX_TEMPLATE.text)
+            .expect("parse and compile the index template");
+
         Self {
             index_path,
             views_path,
+            templates,
         }
     }
 
     pub fn render(&self, charts: &[Chart]) -> Result<()> {
-        let mut template = TinyTemplate::new();
-
         if !self.views_path.exists() {
             fs::create_dir(self.views_path)?;
         }
 
-        for item in TEMPLATES.iter() {
-            template.add_template(item.name, item.text)?;
+        for view in VIEWS.iter() {
+            let charts: Vec<&Chart> = view.select(charts.iter()).collect();
+            let chart_context = ChartContext::new(charts);
+            let charts = self
+                .templates
+                .render(CHARTS_TEMPLATE.name, &chart_context)?;
 
-            let charts: Vec<&Chart> = charts
-                .iter()
-                .filter(|c| {
-                    !item.groups.is_empty()
-                        && item
-                            .groups
-                            .iter()
-                            .all(|g| c.groups.iter().any(|cg| cg == g))
-                })
-                .collect();
-
-            let context = Context::new(charts);
-            let text = template.render(item.name, &context)?;
-            self.create_file(item.file_name, &text)?;
+            let view_context = ViewContext::new(charts);
+            let text = self.templates.render(VIEW_TEMPLATE.name, &view_context)?;
+            self.create_file(view.file_name, &text)?;
         }
 
         Ok(())
@@ -115,12 +138,23 @@ impl<'a> Template<'a> {
 }
 
 #[derive(Serialize)]
-struct Context<'a> {
+struct ViewContext {
+    view: String,
+}
+
+impl ViewContext {
+    pub fn new(view: String) -> ViewContext {
+        Self { view }
+    }
+}
+
+#[derive(Serialize)]
+struct ChartContext<'a> {
     charts: Vec<&'a Chart>,
 }
 
-impl<'a> Context<'a> {
-    pub fn new(charts: Vec<&'a Chart>) -> Context<'a> {
+impl<'a> ChartContext<'a> {
+    pub fn new(charts: Vec<&'a Chart>) -> ChartContext<'a> {
         Self { charts }
     }
 }

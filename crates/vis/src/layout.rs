@@ -11,7 +11,7 @@ use mprobe_diagnostics::DiagnosticData;
 use crate::error::Result;
 use crate::layout::iter::ErrorHandlingIter;
 use crate::layout::series::SeriesGen;
-use crate::template::Template;
+use crate::template::TemplateEngine;
 
 /// The data visualization directory is structured as follows:
 ///
@@ -64,7 +64,7 @@ impl VisLayout {
         let iter = ErrorHandlingIter::new(diagnostic_data.into_iter());
 
         let charts = series_gen.write(iter)?;
-        let template = Template::new(&self.index_file_path, &self.views_path);
+        let template = TemplateEngine::new(&self.index_file_path, &self.views_path);
 
         template.render(&charts)
     }
