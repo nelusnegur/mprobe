@@ -1,91 +1,115 @@
-use std::collections::hash_map::Entry;
-use std::collections::HashMap;
 use std::fmt::Display;
-use std::fs;
-use std::fs::File;
-use std::fs::OpenOptions;
-use std::path::Path;
+use std::format;
+use std::io::Seek;
+use std::io::Write;
+use std::marker::PhantomData;
 use std::sync::Arc;
 
-use chrono::DateTime;
-use chrono::Utc;
-use mprobe_diagnostics::metrics::MetricsChunk;
-
-use crate::chart::Chart;
 use crate::chart::Series;
-use crate::id::Id;
-use crate::layout::writer::SeriesWriter;
 
-const SERIES_FILE_NAME: &str = "series";
+const COMMON_RESERVED_BYTES: usize =
+26 /* static characters */ +
+8 /* spaces */ +
+32 /* 2 * 16 bytes for two usizes */ +
+1 /* new line */;
 
-pub struct SeriesGen<'a> {
-    path: &'a Path,
+pub struct SeriesWriter<W, X, Y> {
+    writer: W,
+    index: usize,
+    series: Arc<Series>,
+    xtype: PhantomData<X>,
+    ytype: PhantomData<Y>,
 }
 
-impl<'a> SeriesGen<'a> {
-    pub fn new(path: &'a Path) -> SeriesGen<'a> {
-        Self { path }
+impl<W: Write + Seek, X: Display, Y: Display> SeriesWriter<W, X, Y> {
+    pub fn new(writer: W, series: Arc<Series>) -> Self {
+        Self {
+            writer,
+            index: 0,
+            series,
+            xtype: PhantomData,
+            ytype: PhantomData,
+        }
     }
 
-    pub fn write<I>(&mut self, metrics: I) -> Result<Vec<Chart>, std::io::Error>
-    where
-        I: Iterator<Item = MetricsChunk>,
-    {
-        if !self.path.exists() {
-            fs::create_dir(self.path)?;
-        }
+    pub fn start(&mut self) -> Result<(), std::io::Error> {
+        let total_reserved_bytes =
+            COMMON_RESERVED_BYTES + self.series.xs.len() + self.series.xs.len();
+        let whitespaces = b" ".repeat(total_reserved_bytes);
 
-        let mut writers: HashMap<String, SeriesWriter<File, Timestamp, f64>> =
-            HashMap::with_capacity(200);
-        let mut charts: Vec<Chart> = Vec::with_capacity(500);
+        self.writer.write_all(&whitespaces)?;
+        self.writer.write_all(b"\n")
+    }
 
-        for chunk in metrics {
-            for metric in chunk.metrics {
-                // TODO: Put the metric name behind the arc
-                let writer = match writers.entry(metric.name.clone()) {
-                    Entry::Occupied(entry) => entry.into_mut(),
-                    Entry::Vacant(vacant_entry) => {
-                        let id = Id::next();
-                        let file_name = format!("{SERIES_FILE_NAME}{id}.js");
-                        let file_path: Arc<Path> = Arc::from(self.path.join(file_name));
-                        let series = Arc::new(Series::from(id));
-                        let writer = OpenOptions::new()
-                            .create(true)
-                            .write(true)
-                            .truncate(false)
-                            .open(&file_path)?;
+    pub fn write(&mut self, x: X, y: Y) -> Result<(), std::io::Error> {
+        let line = format!(
+            "{xs}[{idx}] = {x}; {ys}[{idx}] = {y};\n",
+            xs = self.series.xs,
+            ys = self.series.ys,
+            idx = self.index,
+            x = x,
+            y = y
+        );
 
-                        let chart =
-                            Chart::new(id, metric.name.clone(), metric.groups, Arc::clone(&series), file_path);
-                        charts.push(chart);
+        self.writer.write_all(line.as_bytes())?;
+        self.index += 1;
 
-                        let mut writer = SeriesWriter::new(writer, Arc::clone(&series));
-                        writer.start()?;
+        Ok(())
+    }
 
-                        vacant_entry.insert(writer)
-                    }
-                };
+    pub fn end(mut self) -> Result<(), std::io::Error> {
+        // TODO: Handle the error when rewind fails due to buffer flush
+        self.writer.rewind()?;
 
-                for measurement in metric.measurements {
-                    let x = Timestamp(measurement.timestamp);
-                    let y = measurement.value.into();
-                    writer.write(x, y)?;
-                }
-            }
-        }
+        let first_line = format!(
+            "let {xs} = new Array({size}), {ys} = new Array({size});\n",
+            xs = self.series.xs,
+            ys = self.series.ys,
+            size = self.index
+        );
 
-        for (_, writer) in writers {
-            writer.end()?;
-        }
-
-        Ok(charts)
+        self.writer.write_all(first_line.as_bytes())
     }
 }
 
-struct Timestamp(DateTime<Utc>);
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Cursor;
 
-impl Display for Timestamp {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "\"{}\"", self.0.to_rfc3339())
+    #[test]
+    fn write_chart_data() -> Result<(), std::io::Error> {
+        let buffer: Vec<u8> = Vec::new();
+        let mut writer: Cursor<Vec<u8>> = Cursor::new(buffer);
+        let series = Arc::new(Series::new(String::from("xs"), String::from("ys")));
+        let mut series = SeriesWriter::new(&mut writer, series);
+
+        let xs = vec![1.0, 2.0, 3.0, 4.0, 5.0];
+        let ys = vec![1.0, 2.0, 3.0, 4.0, 5.0];
+
+        let expected_output = b"let xs = new Array(5), ys = new Array(5);
+                             
+xs[0] = 1; ys[0] = 1;
+xs[1] = 2; ys[1] = 2;
+xs[2] = 3; ys[2] = 3;
+xs[3] = 4; ys[3] = 4;
+xs[4] = 5; ys[4] = 5;
+";
+        let expected_output = std::str::from_utf8(expected_output).unwrap();
+
+        series.start()?;
+
+        for (x, y) in xs.into_iter().zip(ys) {
+            series.write(x, y)?;
+        }
+
+        series.end()?;
+
+        let buff = writer.into_inner();
+        let content = std::str::from_utf8(&buff).unwrap();
+
+        assert_eq!(expected_output, content);
+
+        Ok(())
     }
 }
