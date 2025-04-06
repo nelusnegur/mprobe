@@ -78,6 +78,7 @@ impl Display for MetricValue {
 impl MetricsChunk {
     const METRIC_NAME_DELIMITER: &str = " ";
     const START_TIMESTAMP_METRIC_NAME: &str = "start";
+    const END_TIMESTAMP_METRIC_NAME: &str = "end";
 
     pub(crate) fn from_reader<R: Read + ?Sized>(
         reader: &mut R,
@@ -113,6 +114,12 @@ impl MetricsChunk {
                         timestamps = ts;
                     };
 
+                    continue;
+                }
+            }
+
+            if let Some(name) = metric.groups.last() {
+                if name == Self::END_TIMESTAMP_METRIC_NAME {
                     continue;
                 }
             }
