@@ -2,8 +2,8 @@ use std::io;
 use std::io::Cursor;
 use std::io::Read;
 
-use bson::spec::ElementType;
 use bson::Document;
+use bson::spec::ElementType;
 use chrono::TimeZone;
 use chrono::Utc;
 
@@ -94,7 +94,7 @@ impl MetricParser {
 
                     metrics.push(MetricInitVal::new(
                         parts,
-                        ValueType::DateTime,
+                        ValueType::UnixTimeMillis,
                         value.as_datetime().unwrap().timestamp_millis() as u64,
                     ));
                 }
@@ -105,7 +105,7 @@ impl MetricParser {
 
                     metrics.push(MetricInitVal::new(
                         parts,
-                        ValueType::U32,
+                        ValueType::UnixTime,
                         value.as_timestamp().unwrap().time as u64,
                     ));
 
@@ -235,7 +235,8 @@ pub(super) enum ValueType {
     I64,
     F64,
     Bool,
-    DateTime,
+    UnixTime,
+    UnixTimeMillis,
 }
 
 impl ValueType {
@@ -246,7 +247,12 @@ impl ValueType {
             ValueType::I64 => MetricValue::Int64(value as i64),
             ValueType::F64 => MetricValue::Float64(value as f64),
             ValueType::Bool => MetricValue::Boolean(value != 0),
-            ValueType::DateTime => MetricValue::DateTime(
+            ValueType::UnixTime => MetricValue::DateTime(
+                Utc.timestamp_opt(value as i64, 0)
+                    .single()
+                    .expect("timestamp to be converted to UTC"),
+            ),
+            ValueType::UnixTimeMillis => MetricValue::DateTime(
                 Utc.timestamp_millis_opt(value as i64)
                     .single()
                     .expect("timestamp to be converted to UTC"),
