@@ -3,6 +3,7 @@ mod raw;
 use std::fmt::Display;
 use std::io::Cursor;
 use std::io::Read;
+use std::sync::Arc;
 
 use bson::Document;
 use chrono::DateTime;
@@ -26,7 +27,7 @@ pub struct MetricsChunk {
 
 #[derive(Debug, Clone)]
 pub struct Metric {
-    pub name: String,
+    pub name: Arc<str>,
     pub groups: Vec<String>,
     pub measurements: Vec<Measurement>,
     pub start_date: DateTime<Utc>,
@@ -124,7 +125,7 @@ impl MetricsChunk {
                 }
             }
 
-            let name: String = metric.groups.join(Self::METRIC_NAME_DELIMITER);
+            let name: Arc<str> = Arc::from(metric.groups.join(Self::METRIC_NAME_DELIMITER));
             let measurements = timestamps
                 .iter()
                 .zip(metric.values)
@@ -134,7 +135,9 @@ impl MetricsChunk {
                 })
                 .collect::<Vec<Measurement>>();
 
-            let ts_err = || MetricParseError::MetricTimestampNotFound { name: name.clone() };
+            let ts_err = || MetricParseError::MetricTimestampNotFound {
+                name: Arc::clone(&name),
+            };
             let start_date = timestamps.first().ok_or_else(ts_err)?.to_owned();
             let end_date = timestamps.last().ok_or_else(ts_err)?.to_owned();
 
@@ -148,7 +151,7 @@ impl MetricsChunk {
         }
 
         let ts_err = || MetricParseError::MetricTimestampNotFound {
-            name: Self::START_TIMESTAMP_METRIC_NAME.to_owned(),
+            name: Arc::from(Self::START_TIMESTAMP_METRIC_NAME),
         };
         let start_chunk = chunk_timestamps.first().ok_or_else(ts_err)?.to_owned();
         let end_chunk = chunk_timestamps.last().ok_or_else(ts_err)?.to_owned();

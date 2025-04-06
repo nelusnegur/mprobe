@@ -35,14 +35,13 @@ impl<'a> DataEngine<'a> {
             fs::create_dir(self.path)?;
         }
 
-        let mut writers: HashMap<String, SeriesWriter<File, Timestamp, f64>> =
+        let mut writers: HashMap<Arc<str>, SeriesWriter<File, Timestamp, f64>> =
             HashMap::with_capacity(200);
         let mut charts: Vec<Chart> = Vec::with_capacity(500);
 
         for chunk in metrics {
             for metric in chunk.metrics {
-                // TODO: Put the metric name behind the arc
-                let writer = match writers.entry(metric.name.clone()) {
+                let writer = match writers.entry(Arc::clone(&metric.name)) {
                     Entry::Occupied(entry) => entry.into_mut(),
                     Entry::Vacant(vacant_entry) => {
                         let id = Id::next();
@@ -57,7 +56,7 @@ impl<'a> DataEngine<'a> {
 
                         let chart = Chart::new(
                             id,
-                            metric.name.clone(),
+                            Arc::clone(&metric.name),
                             metric.groups,
                             Arc::clone(&series),
                             file_path,

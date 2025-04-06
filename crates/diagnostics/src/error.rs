@@ -32,7 +32,7 @@ pub enum MetricParseError {
     MetricsCountMismatch,
 
     /// The metric timestamps for the given metric are missing.
-    MetricTimestampNotFound { name: String },
+    MetricTimestampNotFound { name: Arc<str> },
 
     /// A [`TryFromIntError`] encountered while converting integer values from [`i32`] to
     /// [`usize`].

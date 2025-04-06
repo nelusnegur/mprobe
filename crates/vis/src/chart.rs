@@ -8,14 +8,14 @@ use crate::id::Id;
 #[derive(Serialize, Debug)]
 pub struct Chart {
     id: Id,
-    name: String,
+    name: Arc<str>,
     pub(crate) groups: Vec<String>,
     series: Arc<Series>,
     series_path: Arc<Path>,
 }
 
 impl Chart {
-    pub fn new(id: Id, name: String, groups: Vec<String>, series: Arc<Series>, series_path: Arc<Path>) -> Chart {
+    pub fn new(id: Id, name: Arc<str>, groups: Vec<String>, series: Arc<Series>, series_path: Arc<Path>) -> Chart {
         Self {
             id,
             name,
