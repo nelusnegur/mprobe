@@ -1,15 +1,3 @@
-<script>
-  let chartConfig = \{
-    "xaxis": \{"type": "date", "autorange": true },
-    "yaxis": \{"type": "linear", "autorange": true },
-    "width": 800,
-    "height": 400,
-    "showlegend": false,
-    "autosize": false,
-    "hovermode": "closest"
-  };
-</script>
-
 {{- for chart in charts }}
 <div>
   <details>
@@ -21,8 +9,18 @@
       trace{chart.id}.x = {chart.series.xs};
       trace{chart.id}.y = {chart.series.ys};
 
+      let chartLayout{chart.id} = \{
+        "xaxis": \{"type": "date", "autorange": true, spikemode: "toaxis+across", spikedash: "dot", spikecolor: "red", spikethickness: 2 },
+        "yaxis": \{"type": "{ chart.yaxis_type }", "autorange": true, spikemode: "toaxis+across", spikedash: "dot", spikecolor: "red", spikethickness: 2 },
+        "width": 1000,
+        "height": 400,
+        "showlegend": false,
+        "autosize": false,
+        "hovermode": "closest"
+      };
+
       const chart{chart.id} = document.getElementById("{ chart.id }");
-      Plotly.newPlot(chart{chart.id}, [trace{chart.id}], chartConfig);
+      Plotly.newPlot(chart{chart.id}, [trace{chart.id}], chartLayout{chart.id});
     </script>
   </details>
 </div>

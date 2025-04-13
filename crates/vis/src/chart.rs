@@ -10,16 +10,25 @@ pub struct Chart {
     id: Id,
     name: Arc<str>,
     pub(crate) groups: Vec<String>,
+    yaxis_type: AxisType,
     series: Arc<Series>,
     series_path: Arc<Path>,
 }
 
 impl Chart {
-    pub fn new(id: Id, name: Arc<str>, groups: Vec<String>, series: Arc<Series>, series_path: Arc<Path>) -> Chart {
+    pub fn new(
+        id: Id,
+        name: Arc<str>,
+        groups: Vec<String>,
+        yaxis_type: AxisType,
+        series: Arc<Series>,
+        series_path: Arc<Path>,
+    ) -> Chart {
         Self {
             id,
             name,
             groups,
+            yaxis_type,
             series,
             series_path,
         }
@@ -43,4 +52,15 @@ impl Series {
 
         Self::new(xs, ys)
     }
+}
+
+#[derive(Debug, Default, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum AxisType {
+    #[default]
+    Linear,
+    Date,
+    Log,
+    Category,
+    Multicategory,
 }
