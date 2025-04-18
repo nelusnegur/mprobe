@@ -1,5 +1,4 @@
 mod data;
-mod axes;
 mod iter;
 mod series;
 

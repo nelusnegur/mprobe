@@ -1,8 +1,11 @@
+pub(crate) mod axes;
+
 use std::path::Path;
 use std::sync::Arc;
 
 use serde::Serialize;
 
+use crate::chart::axes::AxisType;
 use crate::id::Id;
 
 #[derive(Serialize, Debug)]
@@ -52,15 +55,4 @@ impl Series {
 
         Self::new(xs, ys)
     }
-}
-
-#[derive(Debug, Default, Serialize)]
-#[serde(rename_all = "lowercase")]
-pub enum AxisType {
-    #[default]
-    Linear,
-    Date,
-    Log,
-    Category,
-    Multicategory,
 }

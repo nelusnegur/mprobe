@@ -13,8 +13,8 @@ use mprobe_diagnostics::metrics::MetricsChunk;
 
 use crate::chart::Chart;
 use crate::chart::Series;
+use crate::chart::axes::AxisType;
 use crate::id::Id;
-use crate::layout::axes::ChartLayout;
 use crate::layout::series::SeriesWriter;
 
 const DATA_FILE_NAME: &str = "data";
@@ -59,7 +59,7 @@ impl<'a> DataEngine<'a> {
                             id,
                             Arc::clone(&metric.name),
                             metric.groups,
-                            ChartLayout::yaxis(&metric.name, &metric.measurements),
+                            AxisType::yaxis(&metric.name, &metric.measurements),
                             Arc::clone(&series),
                             file_path,
                         );

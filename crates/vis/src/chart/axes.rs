@@ -1,11 +1,20 @@
 use mprobe_diagnostics::metrics::Measurement;
 use mprobe_diagnostics::metrics::MetricValue;
 
-use crate::chart::AxisType;
+use serde::Serialize;
 
-pub(crate) struct ChartLayout;
+#[derive(Debug, Default, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum AxisType {
+    #[default]
+    Linear,
+    Date,
+    Log,
+    Category,
+    Multicategory,
+}
 
-impl ChartLayout {
+impl AxisType {
     pub fn yaxis(_metric_name: &str, measurements: &[Measurement]) -> AxisType {
         if let Some(first_measurement) = measurements.first() {
             match first_measurement.value {
