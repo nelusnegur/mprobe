@@ -15,7 +15,7 @@ pub enum AxisType {
 }
 
 impl AxisType {
-    pub fn yaxis(_metric_name: &str, measurements: &[Measurement]) -> AxisType {
+    pub fn yaxis(measurements: &[Measurement]) -> AxisType {
         if let Some(first_measurement) = measurements.first() {
             match first_measurement.value {
                 MetricValue::DateTime(_) => AxisType::Date,

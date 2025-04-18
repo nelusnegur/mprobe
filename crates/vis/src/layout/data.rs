@@ -59,7 +59,7 @@ impl<'a> DataEngine<'a> {
                             id,
                             Arc::clone(&metric.name),
                             metric.groups,
-                            AxisType::yaxis(&metric.name, &metric.measurements),
+                            AxisType::yaxis(&metric.measurements),
                             Arc::clone(&series),
                             file_path,
                         );
