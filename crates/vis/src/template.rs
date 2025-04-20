@@ -31,35 +31,50 @@ static VIEW_TEMPLATE: Template = Template {
 
 struct View {
     name: &'static str,
-    groups: &'static [&'static str],
+    ingroup: &'static [&'static [&'static str]],
+    exgroup: &'static [&'static [&'static str]],
     file_name: &'static str,
 }
 
-static VIEWS: [View; 5] = [
+static VIEWS: [View; 6] = [
     View {
         name: "Server status",
-        groups: &["serverStatus"],
+        ingroup: &[&["serverStatus"]],
+        exgroup: &[
+            &["serverStatus", "wiredTiger"],
+            &["serverStatus", "metrics"],
+        ],
         file_name: "server-status.html",
     },
     View {
         name: "ReplicaSet status",
-        groups: &["replSetGetStatus"],
+        ingroup: &[&["replSetGetStatus"]],
+        exgroup: &[],
         file_name: "replset-status.html",
     },
     View {
         name: "WiredTiger",
-        groups: &["serverStatus", "wiredTiger"],
+        ingroup: &[&["serverStatus", "wiredTiger"]],
+        exgroup: &[],
         file_name: "wiredtiger.html",
     },
     View {
         name: "Oplog",
-        groups: &["local.oplog.rs.stats"],
+        ingroup: &[&["local.oplog.rs.stats"]],
+        exgroup: &[],
         file_name: "oplog.html",
     },
     View {
         name: "System metrics",
-        groups: &["systemMetrics"],
+        ingroup: &[&["systemMetrics"]],
+        exgroup: &[],
         file_name: "system-metrics.html",
+    },
+    View {
+        name: "Server metrics",
+        ingroup: &[&["serverStatus", "metrics"]],
+        exgroup: &[],
+        file_name: "server-metrics.html",
     },
 ];
 
@@ -68,13 +83,26 @@ impl View {
     where
         I: Iterator<Item = &'c Chart>,
     {
-        charts.filter(|c| {
-            !self.groups.is_empty()
-                && self
-                    .groups
-                    .iter()
-                    .all(|g| c.groups.iter().any(|cg| cg == g))
-        })
+        charts
+            .filter(|c| self.ingroup.includes(&c.groups))
+            .filter(|c| self.exgroup.excludes(&c.groups))
+    }
+}
+
+trait Group {
+    fn includes(&self, group: &[String]) -> bool;
+
+    fn excludes(&self, group: &[String]) -> bool {
+        !self.includes(group)
+    }
+}
+
+impl Group for &[&[&str]] {
+    fn includes(&self, group: &[String]) -> bool {
+        !self.is_empty()
+            && self
+                .iter()
+                .any(|g| !g.is_empty() && g.iter().all(|gg| group.iter().any(|xg| xg == gg)))
     }
 }
 
