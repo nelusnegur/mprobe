@@ -10,8 +10,8 @@
       trace{chart.id}.y = {chart.series.ys};
 
       let chartLayout{chart.id} = \{
-        "xaxis": \{"type": "date", "autorange": true, spikemode: "toaxis+across", spikedash: "dot", spikecolor: "red", spikethickness: 2 },
-        "yaxis": \{"type": "{ chart.yaxis_type }", "autorange": true, spikemode: "toaxis+across", spikedash: "dot", spikecolor: "red", spikethickness: 2 },
+        "xaxis": \{"type": "date", "autorange": true, spikemode: "toaxis+across", spikedash: "dot", spikecolor: "gray", spikethickness: 2 },
+        "yaxis": \{"type": "{ chart.yaxis_type }", "autorange": true, spikemode: "toaxis+across", spikedash: "dot", spikecolor: "gray", spikethickness: 2 },
         "width": 1000,
         "height": 400,
         "showlegend": false,
