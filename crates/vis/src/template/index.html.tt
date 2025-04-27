@@ -6,16 +6,49 @@
   <script src="https://cdn.plot.ly/plotly-3.0.1.min.js" charset="utf-8"></script>
 </head>
 
+<style>
+  .container \{
+    display: grid;
+    grid-template-columns: 1fr;
+    grid-template-rows: 0fr 1fr;
+    grid-template-areas:
+      "header"
+      "items";
+    justify-items: center;
+  }
+
+  .header \{
+    grid-area: header;
+  }
+
+  .items \{
+    grid-area: items;
+    font-size: 1.2em;
+  }
+
+  .items li \{
+	  margin-bottom: 5px;
+  }
+</style>
+
 <body>
-    <h2>MongoDB Full Time Diagnostic Data Capture<h2>
 
-    <ul>
-      {{- for view in views }}
-      <li>
-        <a href="./views/{ view.file_name }">{ view.name }</a>
-      </li>
-      {{- endfor }}
-    </ul>
+  <div class="container">
+    <div class="header">
+      <h2>MongoDB Full Time Diagnostic Data Capture<h2>
+    </div>
 
+    <div class="items">
+      <ul>
+        {{- for view in views }}
+        <li>
+          <a href="./views/{ view.file_name }" target="_blank">{ view.name }</a>
+        </li>
+        {{- endfor }}
+      </ul>
+    </div>
+
+  </div>
 </body>
+
 </html>
