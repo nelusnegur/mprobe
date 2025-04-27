@@ -6,8 +6,40 @@
   <script src="https://cdn.plot.ly/plotly-3.0.1.min.js" charset="utf-8"></script>
 </head>
 
+<style>
+  .container \{
+    display: grid;
+    grid-template-columns: 1fr;
+    grid-template-rows: 0fr 1fr;
+    grid-template-areas:
+      "header"
+      "content";
+    grid-column-gap: 0px;
+    grid-row-gap: 0px;
+    justify-items: center;
+  }
+
+  .header \{
+    grid-area: header;
+  }
+
+  .content \{
+    grid-area: content;
+    display: grid;
+  }
+</style>
+
 <body>
-  { view | unescaped }
+  <div class="container">
+    <div class="header">
+      <h2>{ name }</h2>
+    </div>
+
+    <div class="content">
+      { view | unescaped }
+    </div>
+
+  </div>
 </body>
 
 </html>

@@ -38,7 +38,7 @@ struct View {
 
 static VIEWS: [View; 6] = [
     View {
-        name: "Server status",
+        name: "Server Status",
         ingroup: &[&["serverStatus"]],
         exgroup: &[
             &["serverStatus", "wiredTiger"],
@@ -47,31 +47,31 @@ static VIEWS: [View; 6] = [
         file_name: "server-status.html",
     },
     View {
-        name: "ReplicaSet status",
+        name: "Replica Set Status",
         ingroup: &[&["replSetGetStatus"]],
         exgroup: &[],
         file_name: "replset-status.html",
     },
     View {
-        name: "WiredTiger",
+        name: "WiredTiger Storage Engine",
         ingroup: &[&["serverStatus", "wiredTiger"]],
         exgroup: &[],
         file_name: "wiredtiger.html",
     },
     View {
-        name: "Oplog",
+        name: "Oplog Collection",
         ingroup: &[&["local.oplog.rs.stats"]],
         exgroup: &[],
         file_name: "oplog.html",
     },
     View {
-        name: "System metrics",
+        name: "System Metrics",
         ingroup: &[&["systemMetrics"]],
         exgroup: &[],
         file_name: "system-metrics.html",
     },
     View {
-        name: "Server metrics",
+        name: "Server Metrics",
         ingroup: &[&["serverStatus", "metrics"]],
         exgroup: &[],
         file_name: "server-metrics.html",
@@ -149,7 +149,10 @@ impl<'a> TemplateEngine<'a> {
                 .templates
                 .render(CHARTS_TEMPLATE.name, &chart_context)?;
 
-            let view_context = ViewContext { view: charts };
+            let view_context = ViewContext {
+                view: charts,
+                name: view.name,
+            };
             let text = self.templates.render(VIEW_TEMPLATE.name, &view_context)?;
             self.create_view(view.file_name, &text)?;
         }
@@ -195,6 +198,7 @@ impl<'a> TemplateEngine<'a> {
 #[derive(Serialize)]
 struct ViewContext {
     view: String,
+    name: &'static str,
 }
 
 #[derive(Serialize)]
