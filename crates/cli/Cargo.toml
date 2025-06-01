@@ -6,8 +6,9 @@ edition = "2024"
 license = "MIT"
 readme = "README.md"
 repository = "https://github.com/nelusnegur/mprobe/crates/cli"
-keywords = [ "mongodb", "diagnostics", "ftdc" ]
-categories = ["command-line-utilities", "text-processing"]
+keywords = [ "diagnostics", "ftdc", "mongodb", "visualization" ]
+description = "A diagnostics probe CLI for MongoDB"
+categories = ["command-line-utilities", "database", "visualization"]
 include = [
   "src/**/*",
   "Cargo.toml",
