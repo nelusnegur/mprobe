@@ -22,36 +22,33 @@ use crate::metrics::MetricsChunk;
 use crate::read::MetricsIterator;
 
 #[derive(Debug)]
-pub struct DiagnosticData<'a> {
-    pub path: &'a Path,
+pub struct DiagnosticData {
     entries: ReadDir,
     filter: MetricsFilter,
 }
 
-impl<'a> DiagnosticData<'a> {
-    pub fn new(path: &'a Path) -> Result<Self, io::Error> {
+impl DiagnosticData {
+    pub fn new(path: &Path) -> Result<Self, io::Error> {
         let entries = fs::read_dir(path)?;
         let filter = MetricsFilter::default();
 
         Ok(Self {
-            path,
             entries,
             filter,
         })
     }
 
-    pub fn filter(path: &'a Path, filter: MetricsFilter) -> Result<Self, io::Error> {
+    pub fn filter(path: &Path, filter: MetricsFilter) -> Result<Self, io::Error> {
         let entries = fs::read_dir(path)?;
 
         Ok(Self {
-            path,
             entries,
             filter,
         })
     }
 }
 
-impl IntoIterator for DiagnosticData<'_> {
+impl IntoIterator for DiagnosticData {
     type Item = Result<MetricsChunk, MetricParseError>;
 
     type IntoIter = MetricsIterator;
@@ -93,7 +90,7 @@ impl<'a> DiagnosticDataBuilder<'a> {
         self
     }
 
-    pub fn build(self) -> Result<DiagnosticData<'a>, io::Error> {
+    pub fn build(self) -> Result<DiagnosticData, io::Error> {
         let filter = MetricsFilter {
             hostname: self.hostname,
             start_timestamp: self.start_timestamp,
