@@ -3,6 +3,7 @@ use bson::Document;
 use crate::error::KeyAccessError;
 use crate::error::ValueAccessResultExt;
 
+const COMMON_KEY: &str = "common";
 const SERVER_STATUS_KEY: &str = "serverStatus";
 const HOST_KEY: &str = "host";
 const PROCESS_KEY: &str = "process";
@@ -17,7 +18,15 @@ pub struct Metadata {
 
 impl Metadata {
     pub(crate) fn from_reference_document(doc: &Document) -> Result<Metadata, KeyAccessError> {
-        let server_status = doc
+        // In MongoDB 8.0 a new nested field, common, was introduced,
+        // and we have to account for it as well until all the previous
+        // versions are no longer supported.
+        let common = match doc.get_document(COMMON_KEY) {
+            Ok(common) => common,
+            Err(_) => doc,
+        };
+
+        let server_status = common
             .get_document(SERVER_STATUS_KEY)
             .map_value_access_err(SERVER_STATUS_KEY)?;
 

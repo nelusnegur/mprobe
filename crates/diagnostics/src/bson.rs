@@ -10,6 +10,7 @@ const DATA_TYPE_KEY: &str = "type";
 const METADATA_KEY: &str = "doc";
 const METRICS_CHUNK_KEY: &str = "data";
 
+const COMMON_KEY: &str = "common";
 const HOST_INFO_KEY: &str = "hostInfo";
 const SYSTEM_KEY: &str = "system";
 const HOSTNAME_KEY: &str = "hostname";
@@ -62,7 +63,15 @@ impl ReadDocument for Document {
             .get_document(METADATA_KEY)
             .map_value_access_err(METADATA_KEY)?;
 
-        let host_info = metadata
+        // In MongoDB 8.0 a new nested field, common, was introduced,
+        // and we have to account for it as well until all the previous
+        // versions are no longer supported.
+        let common = match metadata.get_document(COMMON_KEY) {
+            Ok(common) => common,
+            Err(_) => metadata,
+        };
+
+        let host_info = common
             .get_document(HOST_INFO_KEY)
             .map_value_access_err(HOST_INFO_KEY)?;
 
