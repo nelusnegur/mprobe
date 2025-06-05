@@ -139,7 +139,7 @@ impl Credentials {
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-#[serde(rename_all = "UPPERCASE")]
+#[serde(rename_all = "lowercase")]
 pub(crate) enum Resource {
     Cluster,
     ReplicaSet,
