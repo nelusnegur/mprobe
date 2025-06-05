@@ -96,6 +96,11 @@ impl MetricsFetch {
         loop {
             let job = self.client.get_job(&job.id)?;
 
+            println!(
+                "Current file size (uncompressed) for download: {size} bytes",
+                size = job.uncompressed_size_total_bytes
+            );
+
             match job.status {
                 JobStatus::Success => {
                     self.client.download(&job.id, &self.path)?;
