@@ -73,7 +73,7 @@ impl MetricsFetch {
             from,
             to,
             redacted,
-            size_requested_per_file_bytes: 10000000,
+            size_requested_per_file_bytes: 500_000_000,
         }
     }
 
