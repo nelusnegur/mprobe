@@ -269,11 +269,11 @@ impl Display for Job {
         writeln!(f, "redacted: {redacted}", redacted = self.redacted)?;
 
         if let Some(from_date) = self.log_collection_from_date {
-            writeln!(f, "created at {from_date}")?;
+            writeln!(f, "logs from {from_date}")?;
         }
 
         if let Some(to_date) = self.log_collection_to_date {
-            writeln!(f, "created at {to_date}")?;
+            writeln!(f, "logs to {to_date}")?;
         }
 
         writeln!(
