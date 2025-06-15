@@ -1,6 +1,6 @@
 [package]
 name = "mprobe-diagnostics"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 authors = [ "Nelu Snegur <nelu@pulsarplanet.com>" ]
 keywords = [ "ftdc", "mongodb", "diagnostics", "metrics" ]
