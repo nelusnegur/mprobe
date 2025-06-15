@@ -35,7 +35,7 @@ impl MetricParser {
         Self::select_metrics(reference_doc, Vec::new(), &mut metrics);
 
         if metrics.len() != metrics_count {
-            return Err(MetricParseError::MetricsCountMismatch);
+            return Err(MetricParseError::MetricCountMismatch);
         }
 
         Ok(metrics)
