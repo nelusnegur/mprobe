@@ -16,7 +16,7 @@ pub(crate) fn view(args: ViewArgs) -> Result<(), CliError> {
         output_path.display()
     );
 
-    let filter = MetricsFilter::new(args.node, args.start_timestamp, args.end_timestamp);
+    let filter = MetricsFilter::new(args.node, args.start, args.end);
     let diagnostic_data = DiagnosticData::filter(&args.path, filter).expect("valid path");
 
     let vis = VisLayout::init(&output_path).expect("initializing data vis directory failed");

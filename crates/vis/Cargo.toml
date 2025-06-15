@@ -8,7 +8,7 @@ description = "A library for visualizing MongoDB FTDC metrics"
 categories = ["visualization", "database"]
 license = "MIT"
 readme = "README.md"
-repository = "https://github.com/nelusnegur/mprobe/crates/vis"
+repository = "https://github.com/nelusnegur/mprobe/tree/main/crates/vis"
 include = [
   "src/**/*",
   "Cargo.toml",
@@ -16,10 +16,10 @@ include = [
 ]
 
 [dependencies]
-chrono = "0.4.38"
-mprobe-diagnostics = { version = "0.1.0", path = "../diagnostics" }
+mprobe-diagnostics = { version = "0.1.1" }
 
 serde = { version = "1.0.160", features = [ "derive", "rc" ] }
 serde_json = "1.0.96"
 
+chrono = "0.4.38"
 tinytemplate = "1.2.1"
