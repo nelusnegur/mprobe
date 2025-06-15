@@ -1,3 +1,10 @@
+//! Defines an API for parsing diagnostic metrics.
+//!
+//! One usually gets [metric chunks] by iterating over the [diagnostic data].
+//!
+//! [metric chunks]: crate::metrics::MetricsChunk
+//! [diagnostic data]: crate::DiagnosticData
+
 mod raw;
 
 use std::fmt::Display;
@@ -17,36 +24,71 @@ use crate::metadata::Metadata;
 use crate::metrics::raw::MetricParser;
 use crate::metrics::raw::RawMetric;
 
+/// `MetricsChunk` contains a chunk of metrics in a specified time window,
+/// parsed from the diagnostic data.
 #[derive(Debug, Clone)]
 pub struct MetricsChunk {
+    /// Metadata associated with all the metrics in this chunk.
     pub metadata: Metadata,
+
+    /// A list of diagnostic metrics.
     pub metrics: Vec<Metric>,
-    pub start_date: DateTime<Utc>,
-    pub end_date: DateTime<Utc>,
+
+    /// Specifies the timestamp when the recording of these metrics started.
+    pub start: DateTime<Utc>,
+
+    /// Specifies the timestamp when the recording of these metrics ended.
+    pub end: DateTime<Utc>,
 }
 
+/// `Metric` represents a single diagnostic metric in a specified time window.
 #[derive(Debug, Clone)]
 pub struct Metric {
+    /// Name of the diagnostic metric.
     pub name: Arc<str>,
+
+    /// A list of categories that this metric belongs to.
     pub groups: Vec<String>,
+
+    /// A list of metric measurements.
     pub measurements: Vec<Measurement>,
-    pub start_date: DateTime<Utc>,
-    pub end_date: DateTime<Utc>,
+
+    /// Specifies the timestamp when the recording of this metric started.
+    pub start: DateTime<Utc>,
+
+    /// Specifies the timestamp when the recording of this metric ended.
+    pub end: DateTime<Utc>,
 }
 
+/// `Measurement` represents a measurement of a metric at a single point in time.
 #[derive(Debug, PartialEq, PartialOrd, Clone, Copy)]
 pub struct Measurement {
+    /// Timestamp of the measurement.
     pub timestamp: DateTime<Utc>,
+
+    /// Metric value.
     pub value: MetricValue,
 }
 
+/// `MetricValue` defines the type of the metric value
 #[derive(Debug, PartialEq, PartialOrd, Clone, Copy)]
 pub enum MetricValue {
+    /// Unsigned 32-bit integer.
     UInt32(u32),
+
+    /// Signed 32-bit integer.
     Int32(i32),
+
+    /// Signed 64-bit integer.
     Int64(i64),
+
+    /// Floating-point 64-bit number.
     Float64(f64),
+
+    /// Boolean value.
     Boolean(bool),
+
+    /// Date time.
     DateTime(DateTime<Utc>),
 }
 
@@ -138,14 +180,14 @@ impl MetricsChunk {
             let ts_err = || MetricParseError::MetricTimestampNotFound {
                 name: Arc::clone(&name),
             };
-            let start_date = timestamps.first().ok_or_else(ts_err)?.to_owned();
-            let end_date = timestamps.last().ok_or_else(ts_err)?.to_owned();
+            let start = timestamps.first().ok_or_else(ts_err)?.to_owned();
+            let end = timestamps.last().ok_or_else(ts_err)?.to_owned();
 
             metrics_chunk.push(Metric {
                 name,
                 groups: metric.groups,
-                start_date,
-                end_date,
+                start,
+                end,
                 measurements,
             })
         }
@@ -159,8 +201,8 @@ impl MetricsChunk {
         let metadata = Metadata::from_reference_document(reference_doc)?;
 
         Ok(MetricsChunk {
-            start_date: start_chunk,
-            end_date: end_chunk,
+            start: start_chunk,
+            end: end_chunk,
             metrics: metrics_chunk,
             metadata,
         })

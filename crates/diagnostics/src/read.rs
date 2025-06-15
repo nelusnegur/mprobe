@@ -51,7 +51,7 @@ impl MetricsIterator {
             time_window_filter.try_filter(|d| d.kind().map(|k| k == DocumentKind::MetricsChunk));
         let metrics_reader = MetricsChunkReader::new(metrics_chunk_filter);
         let chunk_filter = metrics_reader
-            .try_filter(move |chunk| Ok(time_window.overlaps(&chunk.start_date, &chunk.end_date)));
+            .try_filter(move |chunk| Ok(time_window.overlaps(&chunk.start, &chunk.end)));
         let metric_chunks = Box::new(chunk_filter);
 
         Self { metric_chunks }
