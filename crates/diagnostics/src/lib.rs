@@ -91,7 +91,7 @@ use crate::error::MetricParseError;
 use crate::metrics::MetricsChunk;
 use crate::read::MetricsIterator;
 
-/// 
+/// `DiagnosticData` defines an API for parsing and reading MongoDB diagnostic data.
 #[derive(Debug)]
 pub struct DiagnosticData {
     entries: ReadDir,
@@ -99,6 +99,11 @@ pub struct DiagnosticData {
 }
 
 impl DiagnosticData {
+    /// Creates a new `DiagnosticData` that will parse and read
+    /// the diagnostic data at the specified `path`.
+    ///
+    /// The `path` must be valid and point to a directory containing
+    /// the diagnostic data unarchived.
     pub fn new(path: &Path) -> Result<Self, io::Error> {
         let entries = fs::read_dir(path)?;
         let filter = MetricsFilter::default();
@@ -106,6 +111,12 @@ impl DiagnosticData {
         Ok(Self { entries, filter })
     }
 
+    /// Creates a new `DiagnosticData` that will parse and read
+    /// the diagnostic data at the specified `path` and filter it
+    /// according to the `filter` specification.
+    ///
+    /// The `path` must be valid and point to a directory containing
+    /// the diagnostic data unarchived.
     pub fn filter(path: &Path, filter: MetricsFilter) -> Result<Self, io::Error> {
         let entries = fs::read_dir(path)?;
 
@@ -123,6 +134,7 @@ impl IntoIterator for DiagnosticData {
     }
 }
 
+/// `MetricsFilter` specifies a filter for the diagnostic data.
 #[derive(Debug, Default)]
 pub struct MetricsFilter {
     pub(crate) hostname: Option<String>,
@@ -131,6 +143,17 @@ pub struct MetricsFilter {
 }
 
 impl MetricsFilter {
+    /// Creates a new `MetricsFilter` used for filtering diagnostic data.
+    ///
+    /// The `MetricsFilter` enables filtering the data based on the following
+    /// parameters:
+    ///
+    /// * `hostname` - if set, selects the data belonging for
+    ///     the specified hostname;
+    /// * `start_timestamp` - if set, selects the data starting at the specified
+    ///     timestamp;
+    /// * `end_timestamp` - if set, selects the data up until the specified
+    ///     timestamp.
     pub fn new(
         hostname: Option<String>,
         start_timestamp: Option<DateTime<Utc>>,
