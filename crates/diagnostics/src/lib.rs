@@ -58,10 +58,10 @@
 //! let path = Path::new("/path/to/diagnostic/data");
 //!
 //! let node = String::from("node-1");
-//! let start_timestamp = Utc::now() - Duration::hours(1);
-//! let end_timestamp = Utc::now();
+//! let start = Utc::now() - Duration::hours(1);
+//! let end = Utc::now();
 //!
-//! let filter = MetricsFilter::new(Some(node), Some(start_timestamp), Some(end_timestamp));
+//! let filter = MetricsFilter::new(Some(node), Some(start), Some(end));
 //! let diagnostic_data = DiagnosticData::filter(&path, filter).expect("valid path");
 //! ```
 //!
@@ -138,8 +138,8 @@ impl IntoIterator for DiagnosticData {
 #[derive(Debug, Default)]
 pub struct MetricsFilter {
     pub(crate) hostname: Option<String>,
-    pub(crate) start_timestamp: Option<DateTime<Utc>>,
-    pub(crate) end_timestamp: Option<DateTime<Utc>>,
+    pub(crate) start: Option<DateTime<Utc>>,
+    pub(crate) end: Option<DateTime<Utc>>,
 }
 
 impl MetricsFilter {
@@ -150,19 +150,17 @@ impl MetricsFilter {
     ///
     /// * `hostname` - if set, selects the data belonging for
     ///     the specified hostname;
-    /// * `start_timestamp` - if set, selects the data starting at the specified
-    ///     timestamp;
-    /// * `end_timestamp` - if set, selects the data up until the specified
-    ///     timestamp.
+    /// * `start` - if set, selects the data starting at the specified timestamp;
+    /// * `end` - if set, selects the data up until the specified timestamp.
     pub fn new(
         hostname: Option<String>,
-        start_timestamp: Option<DateTime<Utc>>,
-        end_timestamp: Option<DateTime<Utc>>,
+        start: Option<DateTime<Utc>>,
+        end: Option<DateTime<Utc>>,
     ) -> Self {
         Self {
             hostname,
-            start_timestamp,
-            end_timestamp,
+            start,
+            end,
         }
     }
 }

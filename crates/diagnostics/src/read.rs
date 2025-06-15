@@ -35,8 +35,8 @@ pub struct MetricsIterator {
 impl MetricsIterator {
     pub(crate) fn new(root_dir: ReadDir, filter: MetricsFilter) -> Self {
         let time_window = Rc::new(TimeWindow::new(
-            filter.start_timestamp,
-            filter.end_timestamp,
+            filter.start,
+            filter.end,
         ));
 
         let traverse_dir = TraverseDir::new(root_dir);

@@ -46,11 +46,11 @@ pub(crate) struct ViewArgs {
 
     /// Specify the start timestamp of the metrics.
     #[arg(short, long)]
-    pub(crate) start_timestamp: Option<DateTime<Utc>>,
+    pub(crate) start: Option<DateTime<Utc>>,
 
     /// Specify the end timestamp of the metrics.
     #[arg(short, long)]
-    pub(crate) end_timestamp: Option<DateTime<Utc>>,
+    pub(crate) end: Option<DateTime<Utc>>,
 }
 
 #[derive(Args)]

@@ -16,14 +16,8 @@ pub(crate) struct TimeWindow {
 }
 
 impl TimeWindow {
-    pub fn new(
-        start_timestamp: Option<DateTime<Utc>>,
-        end_timestamp: Option<DateTime<Utc>>,
-    ) -> Self {
-        Self {
-            start: start_timestamp,
-            end: end_timestamp,
-        }
+    pub fn new(start: Option<DateTime<Utc>>, end: Option<DateTime<Utc>>) -> Self {
+        Self { start, end }
     }
 
     pub(crate) fn includes_with_margin(&self, timestamp: &DateTime<Utc>, margin: Duration) -> bool {
