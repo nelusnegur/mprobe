@@ -5,4 +5,4 @@ Full Time Diagnostic Data Capture (FTDC) metrics.
 
 ## License
 
-It is licensed under [MIT license](LICENSE).
+This project is licensed under [MIT license](LICENSE).

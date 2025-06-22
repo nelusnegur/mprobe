@@ -5,4 +5,4 @@ metrics in a web browser. At the moment it is still very much in progress.
 
 ## License
 
-It is licensed under [MIT license](LICENSE).
+This project is licensed under [MIT license](LICENSE).
