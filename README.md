@@ -12,6 +12,14 @@ The project consists of the following crates:
 - [cli](./crates/cli/)
 
 
+## Installation
+
+You can install the `mprobe` on your machine using `cargo`:
+
+```bash
+cargo install mprobe
+```
+
 ## Usage
 
 ### Fetch the diagnostic metrics
