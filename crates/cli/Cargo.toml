@@ -5,9 +5,9 @@ authors = [ "Nelu Snegur <nelu@pulsarplanet.com>" ]
 edition = "2024"
 license = "MIT"
 readme = "README.md"
-repository = "https://github.com/nelusnegur/mprobe/crates/cli"
+repository = "https://github.com/nelusnegur/mprobe/tree/main/crates/cli"
 keywords = [ "diagnostics", "ftdc", "mongodb", "visualization" ]
-description = "A diagnostics probe CLI for MongoDB"
+description = "A CLI for fetching and visualizing MongoDB diagnostic data"
 categories = ["command-line-utilities", "database", "visualization"]
 include = [
   "src/**/*",

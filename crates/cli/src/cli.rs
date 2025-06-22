@@ -20,7 +20,7 @@ pub(crate) struct Cli {
 
 #[derive(Subcommand)]
 pub(crate) enum Commands {
-    /// Visualize the diagnostic data and generate a visual representation of it.
+    /// Visualize the diagnostic data.
     View(ViewArgs),
 
     /// Fetch the diagnostic data from the Cloud Manager.
