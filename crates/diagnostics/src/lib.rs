@@ -149,7 +149,7 @@ impl MetricsFilter {
     /// parameters:
     ///
     /// * `hostname` - if set, selects the data belonging for
-    ///     the specified hostname;
+    ///   the specified hostname;
     /// * `start` - if set, selects the data starting at the specified timestamp;
     /// * `end` - if set, selects the data up until the specified timestamp.
     pub fn new(

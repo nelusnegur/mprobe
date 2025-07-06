@@ -50,8 +50,8 @@ impl Series {
     }
 
     pub fn from(id: Id) -> Series {
-        let xs = format!("xs_{}", id);
-        let ys = format!("ys_{}", id);
+        let xs = format!("xs_{id}");
+        let ys = format!("ys_{id}");
 
         Self::new(xs, ys)
     }

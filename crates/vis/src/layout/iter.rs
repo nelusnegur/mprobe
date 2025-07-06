@@ -32,7 +32,7 @@ where
                     // we should stop iterating.
                     //
                     // For now just print the error to the stderr
-                    eprintln!("An error occurred while reading metrics: {:?}", err);
+                    eprintln!("An error occurred while reading metrics: {err:?}");
                     continue;
                 }
                 None => return None,

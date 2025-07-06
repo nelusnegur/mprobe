@@ -8,12 +8,13 @@ use std::io::Read;
 use std::path::PathBuf;
 use std::rc::Rc;
 
-use bson::de;
 use bson::Document;
+use bson::de;
 use chrono::DateTime;
 use chrono::Duration;
 use chrono::Utc;
 
+use crate::MetricsFilter;
 use crate::bson::DocumentKind;
 use crate::bson::ReadDocument;
 use crate::error::MetricParseError;
@@ -22,7 +23,6 @@ use crate::filter::TimeWindow;
 use crate::filter::TimeWindowFilter;
 use crate::iter::IteratorExt;
 use crate::metrics::MetricsChunk;
-use crate::MetricsFilter;
 
 /// An iterator that reads recursively diagnostic data files from a root directory
 /// identified by a [`std::fs::Path`], decodes metrics from BSON documents
@@ -34,10 +34,7 @@ pub struct MetricsIterator {
 
 impl MetricsIterator {
     pub(crate) fn new(root_dir: ReadDir, filter: MetricsFilter) -> Self {
-        let time_window = Rc::new(TimeWindow::new(
-            filter.start,
-            filter.end,
-        ));
+        let time_window = Rc::new(TimeWindow::new(filter.start, filter.end));
 
         let traverse_dir = TraverseDir::new(root_dir);
         let path_sorter = PathSorter::new(traverse_dir);
@@ -147,7 +144,7 @@ impl FileInfo {
                 return Err(io::Error::new(
                     ErrorKind::InvalidData,
                     format!("the '{path:?}' path does not have a file extension"),
-                ))
+                ));
             }
         }?;
 
@@ -165,26 +162,21 @@ impl FileInfo {
             Some((ts, uid)) => {
                 let ts = DateTime::parse_from_str(ts, TIMESTAMP_FORMAT)
                     .map_err(|e| {
-                        io::Error::new(
-                            ErrorKind::Other,
-                            format!("parsing file extension timestamp ({ts}) failed: {e}"),
-                        )
+                        io::Error::other(format!(
+                            "parsing file extension timestamp ({ts}) failed: {e}"
+                        ))
                     })?
                     .with_timezone(&Utc);
 
                 let uid = uid.parse::<u16>().map_err(|e| {
-                    io::Error::new(
-                        ErrorKind::Other,
-                        format!("parsing file extension uid ({uid}) failed: {e}"),
-                    )
+                    io::Error::other(format!("parsing file extension uid ({uid}) failed: {e}"))
                 })?;
 
                 Ok((ts, uid))
             }
-            None => Err(io::Error::new(
-                ErrorKind::Other,
-                format!("splitting file extension ({extension}) into ts and uid failed"),
-            )),
+            None => Err(io::Error::other(format!(
+                "splitting file extension ({extension}) into ts and uid failed"
+            ))),
         }
     }
 }
