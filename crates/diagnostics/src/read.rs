@@ -5,7 +5,7 @@ use std::io;
 use std::io::Cursor;
 use std::io::ErrorKind;
 use std::io::Read;
-use std::path::PathBuf;
+use std::path::Path;
 use std::rc::Rc;
 
 use bson::Document;
@@ -80,7 +80,7 @@ impl TraverseDir {
 }
 
 impl Iterator for TraverseDir {
-    type Item = Result<FileInfo, io::Error>;
+    type Item = Result<ReadItem<File>, io::Error>;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
@@ -103,8 +103,12 @@ impl Iterator for TraverseDir {
                                 continue;
                             }
 
-                            let file_info = FileInfo::from(path);
-                            return Some(file_info);
+                            let read_item = match File::open(&path) {
+                                Ok(file) => ReadItem::from(&path, file),
+                                Err(error) => return Some(Err(error)),
+                            };
+
+                            return Some(read_item);
                         } else {
                             continue;
                         }
@@ -121,14 +125,14 @@ impl Iterator for TraverseDir {
 }
 
 #[derive(Debug)]
-struct FileInfo {
-    path: PathBuf,
+struct ReadItem<R: Read> {
+    reader: R,
     timestamp: DateTime<Utc>,
     uid: u16,
 }
 
-impl FileInfo {
-    pub fn from(path: PathBuf) -> Result<FileInfo, io::Error> {
+impl<R: Read> ReadItem<R> {
+    pub fn from(path: &Path, reader: R) -> Result<ReadItem<R>, io::Error> {
         let (timestamp, uid) = match path.extension() {
             Some(extension) => {
                 let extension = extension.to_str().ok_or_else(|| {
@@ -149,7 +153,7 @@ impl FileInfo {
         }?;
 
         Ok(Self {
-            path,
+            reader,
             timestamp,
             uid,
         })
@@ -192,9 +196,10 @@ struct PathFilter<I> {
     time_margin: Duration,
 }
 
-impl<I> PathFilter<I>
+impl<I, R> PathFilter<I>
 where
-    I: Iterator<Item = Result<FileInfo, io::Error>>,
+    I: Iterator<Item = Result<ReadItem<R>, io::Error>>,
+    R: Read,
 {
     fn new(iter: I, time_window: Rc<TimeWindow>) -> Self {
         Self {
@@ -205,22 +210,22 @@ where
     }
 }
 
-impl<I> Iterator for PathFilter<I>
+impl<I, R: Read> Iterator for PathFilter<I>
 where
-    I: Iterator<Item = Result<FileInfo, io::Error>>,
+    I: Iterator<Item = Result<ReadItem<R>, io::Error>>,
 {
-    type Item = Result<FileInfo, io::Error>;
+    type Item = Result<ReadItem<R>, io::Error>;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         loop {
             match self.iter.next()? {
-                Ok(fi) => {
+                Ok(ri) => {
                     if self
                         .time_window
-                        .includes_with_margin(&fi.timestamp, self.time_margin)
+                        .includes_with_margin(&ri.timestamp, self.time_margin)
                     {
-                        return Some(Ok(fi));
+                        return Some(Ok(ri));
                     }
                 }
                 item => return Some(item),
@@ -232,14 +237,15 @@ where
 /// An iterator that traverses the given [`std::path::PathBuf`]s
 /// yielding the paths in sorterd order.
 #[must_use = "iterators are lazy and do nothing unless consumed"]
-struct PathSorter<I> {
+struct PathSorter<I, R: Read> {
     iter: Option<I>,
-    paths: Option<Box<dyn Iterator<Item = Result<FileInfo, io::Error>>>>,
+    paths: Option<Box<dyn Iterator<Item = Result<ReadItem<R>, io::Error>>>>,
 }
 
-impl<I> PathSorter<I>
+impl<I, R> PathSorter<I, R>
 where
-    I: Iterator<Item = Result<FileInfo, io::Error>>,
+    I: Iterator<Item = Result<ReadItem<R>, io::Error>>,
+    R: Read + 'static,
 {
     fn new(iter: I) -> Self {
         Self {
@@ -249,11 +255,12 @@ where
     }
 }
 
-impl<I> Iterator for PathSorter<I>
+impl<I, R> Iterator for PathSorter<I, R>
 where
-    I: Iterator<Item = Result<FileInfo, io::Error>>,
+    I: Iterator<Item = Result<ReadItem<R>, io::Error>>,
+    R: Read + 'static,
 {
-    type Item = Result<FileInfo, io::Error>;
+    type Item = Result<ReadItem<R>, io::Error>;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
@@ -281,12 +288,12 @@ where
 
 #[must_use = "iterators are lazy and do nothing unless consumed"]
 #[derive(Debug)]
-struct FileReader<I> {
+struct FileReader<I, R: Read> {
     iter: I,
-    inner_iter: Option<BsonReader<File>>,
+    inner_iter: Option<BsonReader<R>>,
 }
 
-impl<I> FileReader<I> {
+impl<I, R: Read> FileReader<I, R> {
     pub fn new(iter: I) -> Self {
         Self {
             iter,
@@ -295,9 +302,9 @@ impl<I> FileReader<I> {
     }
 }
 
-impl<I> Iterator for FileReader<I>
+impl<I, R: Read> Iterator for FileReader<I, R>
 where
-    I: Iterator<Item = Result<FileInfo, io::Error>>,
+    I: Iterator<Item = Result<ReadItem<R>, io::Error>>,
 {
     type Item = Result<Document, MetricParseError>;
 
@@ -310,10 +317,7 @@ where
                     item => return item.map(|i| i.map_err(MetricParseError::from)),
                 },
                 None => match self.iter.next()? {
-                    Ok(fi) => match File::open(fi.path) {
-                        Ok(file) => self.inner_iter = Some(BsonReader::new(file)),
-                        Err(err) => return Some(Err(MetricParseError::from(err))),
-                    },
+                    Ok(ri) => self.inner_iter = Some(BsonReader::new(ri.reader)),
                     Err(err) => return Some(Err(MetricParseError::from(err))),
                 },
             }
@@ -328,7 +332,7 @@ struct BsonReader<R> {
     reader: R,
 }
 
-impl<R> BsonReader<R> {
+impl<R: Read> BsonReader<R> {
     fn new(reader: R) -> Self {
         Self { reader }
     }
