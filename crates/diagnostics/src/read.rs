@@ -1,7 +1,6 @@
 mod archive;
+mod directory;
 
-use std::fs;
-use std::fs::File;
 use std::fs::ReadDir;
 use std::io;
 use std::io::Cursor;
@@ -25,6 +24,7 @@ use crate::filter::TimeWindow;
 use crate::filter::TimeWindowFilter;
 use crate::iter::IteratorExt;
 use crate::metrics::MetricsChunk;
+use crate::read::directory::ReadDirectory;
 
 /// An iterator that reads recursively diagnostic data files from a root directory
 /// identified by a [`std::fs::Path`], decodes metrics from BSON documents
@@ -38,7 +38,7 @@ impl MetricsIterator {
     pub(crate) fn new(root_dir: ReadDir, filter: MetricsFilter) -> Self {
         let time_window = Rc::new(TimeWindow::new(filter.start, filter.end));
 
-        let traverse_dir = TraverseDir::new(root_dir);
+        let traverse_dir = ReadDirectory::new(root_dir);
         let path_sorter = PathSorter::new(traverse_dir);
         let path_filter = PathFilter::new(path_sorter, time_window.clone());
 
@@ -63,66 +63,6 @@ impl Iterator for MetricsIterator {
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         self.metric_chunks.next()
-    }
-}
-
-/// An iterator that traverses recursively a directory tree identified by
-/// a [`std::fs::Path`] and yields [`std::path::PathBuf`] for the contained files only.
-#[must_use = "iterators are lazy and do nothing unless consumed"]
-#[derive(Debug)]
-struct TraverseDir {
-    dirs: Vec<ReadDir>,
-}
-
-impl TraverseDir {
-    fn new(root_dir: ReadDir) -> Self {
-        let dirs = vec![root_dir];
-        Self { dirs }
-    }
-}
-
-impl Iterator for TraverseDir {
-    type Item = Result<ReadItem<File>, io::Error>;
-
-    #[inline]
-    fn next(&mut self) -> Option<Self::Item> {
-        loop {
-            let dir = self.dirs.last_mut()?;
-
-            match dir.next() {
-                Some(Ok(entry)) => match entry.file_type() {
-                    Ok(file_type) => {
-                        if file_type.is_dir() {
-                            match fs::read_dir(entry.path()) {
-                                Ok(next_dir) => self.dirs.push(next_dir),
-                                Err(error) => return Some(Err(error)),
-                            }
-                        } else if file_type.is_file() {
-                            // TODO: Process the .interim file last
-                            // For now just skip it.
-                            let path = entry.path();
-                            if path.extension().is_none_or(|e| e == "interim") {
-                                continue;
-                            }
-
-                            let read_item = match File::open(&path) {
-                                Ok(file) => ReadItem::new(&path, file),
-                                Err(error) => return Some(Err(error)),
-                            };
-
-                            return Some(read_item);
-                        } else {
-                            continue;
-                        }
-                    }
-                    Err(error) => return Some(Err(error)),
-                },
-                Some(Err(error)) => return Some(Err(error)),
-                None => {
-                    self.dirs.pop();
-                }
-            }
-        }
     }
 }
 

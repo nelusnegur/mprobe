@@ -26,6 +26,7 @@ impl<R: Read> ReadArchive<R> {
     }
 }
 
+#[must_use = "iterators are lazy and do nothing unless consumed"]
 pub(super) struct ArchiveEntries<'a, R: 'a + Read> {
     entries: Entries<'a, R>,
 }
