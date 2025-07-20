@@ -1,3 +1,5 @@
+mod archive;
+
 use std::fs;
 use std::fs::File;
 use std::fs::ReadDir;
@@ -104,7 +106,7 @@ impl Iterator for TraverseDir {
                             }
 
                             let read_item = match File::open(&path) {
-                                Ok(file) => ReadItem::from(&path, file),
+                                Ok(file) => ReadItem::new(&path, file),
                                 Err(error) => return Some(Err(error)),
                             };
 
@@ -132,7 +134,7 @@ struct ReadItem<R: Read> {
 }
 
 impl<R: Read> ReadItem<R> {
-    pub fn from(path: &Path, reader: R) -> Result<ReadItem<R>, io::Error> {
+    pub fn new(path: &Path, reader: R) -> Result<ReadItem<R>, io::Error> {
         let (timestamp, uid) = match path.extension() {
             Some(extension) => {
                 let extension = extension.to_str().ok_or_else(|| {
