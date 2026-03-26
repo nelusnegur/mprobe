@@ -147,24 +147,24 @@ impl MetricsChunk {
         let mut timestamps: Vec<DateTime<Utc>> = Vec::new();
 
         for metric in metrics.into_iter() {
-            if let Some(name) = metric.groups.last() {
-                if name == Self::START_TIMESTAMP_METRIC_NAME {
-                    let ts = to_timestamps(metric.values).collect();
+            if let Some(name) = metric.groups.last()
+                && name == Self::START_TIMESTAMP_METRIC_NAME
+            {
+                let ts = to_timestamps(metric.values).collect();
 
-                    if metric.groups.len() == 1 {
-                        chunk_timestamps = ts;
-                    } else {
-                        timestamps = ts;
-                    };
+                if metric.groups.len() == 1 {
+                    chunk_timestamps = ts;
+                } else {
+                    timestamps = ts;
+                };
 
-                    continue;
-                }
+                continue;
             }
 
-            if let Some(name) = metric.groups.last() {
-                if name == Self::END_TIMESTAMP_METRIC_NAME {
-                    continue;
-                }
+            if let Some(name) = metric.groups.last()
+                && name == Self::END_TIMESTAMP_METRIC_NAME
+            {
+                continue;
             }
 
             let name: Arc<str> = Arc::from(metric.groups.join(Self::METRIC_NAME_DELIMITER));
