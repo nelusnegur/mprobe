@@ -9,7 +9,8 @@ use std::path::PathBuf;
 use std::rc::Rc;
 
 use bson::Document;
-use bson::de;
+use bson::error::Error as BsonError;
+use bson::error::ErrorKind as BsonErrorKind;
 use chrono::DateTime;
 use chrono::Duration;
 use chrono::Utc;
@@ -335,13 +336,16 @@ impl<R> BsonReader<R> {
 }
 
 impl<R: Read> Iterator for BsonReader<R> {
-    type Item = Result<Document, de::Error>;
+    type Item = Result<Document, BsonError>;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         match Document::from_reader(&mut self.reader) {
             Ok(document) => Some(Ok(document)),
-            Err(de::Error::Io(error)) if error.kind() == io::ErrorKind::UnexpectedEof => None,
+            Err(BsonError {
+                kind: BsonErrorKind::EndOfStream { .. },
+                ..
+            }) => None,
             Err(error) => Some(Err(error)),
         }
     }

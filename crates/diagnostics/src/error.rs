@@ -9,8 +9,9 @@ use std::io;
 use std::num::TryFromIntError;
 use std::sync::Arc;
 
-use bson::de;
-use bson::document::ValueAccessError;
+use bson::error::Error as BsonError;
+use bson::error::ErrorKind as BsonErrorKind;
+use bson::error::ValueAccessErrorKind;
 
 /// The error type for parsing diagnostic metrics.
 ///
@@ -22,7 +23,7 @@ pub enum MetricParseError {
     Io(Arc<io::Error>),
 
     /// A [bson::de::Error] encountered while deserializing BSON documents.
-    BsonDeserialzation(de::Error),
+    BsonDeserialzation(BsonError),
 
     /// A [KeyAccessError] encountered while accessing BSON fields.
     FieldAccess(KeyAccessError),
@@ -96,8 +97,8 @@ impl From<io::Error> for MetricParseError {
     }
 }
 
-impl From<de::Error> for MetricParseError {
-    fn from(error: de::Error) -> Self {
+impl From<BsonError> for MetricParseError {
+    fn from(error: BsonError) -> Self {
         MetricParseError::BsonDeserialzation(error)
     }
 }
@@ -146,17 +147,17 @@ impl Display for KeyAccessError {
             KeyAccessError::KeyNotFound { ref key } => {
                 write!(
                     f,
-                    "{key_access_error} could not find the field with the {key} key",
+                    "{key_access_error} could not find the field with the {key} key"
                 )
             }
             KeyAccessError::UnexpectedKeyType { ref key } => write!(
                 f,
-                "{key_access_error} the field with {key} key was found, but not with the expected type",
+                "{key_access_error} the field with {key} key was found, but not with the expected type"
             ),
             KeyAccessError::AccessError { ref key, ref error } => {
                 write!(
                     f,
-                    "{key_access_error} could not access the field value with the {key} key. {error}",
+                    "{key_access_error} could not access the field value with the {key} key. {error}"
                 )
             }
         }
@@ -169,18 +170,24 @@ pub(crate) trait ValueAccessResultExt<T> {
     fn map_value_access_err(self, key: &str) -> Result<T, KeyAccessError>;
 }
 
-impl<T> ValueAccessResultExt<T> for Result<T, ValueAccessError> {
+impl<T> ValueAccessResultExt<T> for Result<T, BsonError> {
     fn map_value_access_err(self, key: &str) -> Result<T, KeyAccessError> {
-        self.map_err(|error| match error {
-            ValueAccessError::NotPresent => KeyAccessError::KeyNotFound {
-                key: key.to_owned(),
+        self.map_err(|error| match error.kind {
+            BsonErrorKind::ValueAccess { kind, .. } => match kind {
+                ValueAccessErrorKind::NotPresent { .. } => KeyAccessError::KeyNotFound {
+                    key: key.to_owned(),
+                },
+                ValueAccessErrorKind::UnexpectedType { .. } => KeyAccessError::UnexpectedKeyType {
+                    key: key.to_owned(),
+                },
+                e => KeyAccessError::AccessError {
+                    key: key.to_owned(),
+                    error: e.to_string(),
+                },
             },
-            ValueAccessError::UnexpectedType => KeyAccessError::UnexpectedKeyType {
+            _ => KeyAccessError::AccessError {
                 key: key.to_owned(),
-            },
-            e => KeyAccessError::AccessError {
-                key: key.to_owned(),
-                error: e.to_string(),
+                error: format!("{error}"),
             },
         })
     }
