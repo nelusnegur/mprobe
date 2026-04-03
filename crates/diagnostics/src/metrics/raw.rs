@@ -1,11 +1,15 @@
+use core::f64;
 use std::io;
 use std::io::Cursor;
 use std::io::Read;
 
+use bson::Bson;
 use bson::Document;
 use bson::spec::ElementType;
 use chrono::TimeZone;
 use chrono::Utc;
+use rust_decimal::Decimal;
+use rust_decimal::prelude::*;
 
 use crate::bytes;
 use crate::error::MetricParseError;
@@ -87,6 +91,19 @@ impl MetricParser {
                         ValueType::Bool,
                         value.as_bool().unwrap() as u64,
                     ));
+                }
+                ElementType::Decimal128 => {
+                    let mut parts = parent_key.clone();
+                    parts.push(key.to_owned());
+
+                    let val = match value {
+                        Bson::Decimal128(v) => {
+                            Decimal::from_str(v.to_string().as_str()).unwrap().as_f64()
+                        }
+                        _ => f64::NAN,
+                    };
+
+                    metrics.push(MetricInitVal::new(parts, ValueType::F64, val as u64));
                 }
                 ElementType::DateTime => {
                     let mut parts = parent_key.clone();
