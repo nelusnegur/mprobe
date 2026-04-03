@@ -1,6 +1,6 @@
 [package]
 name = "mprobe-vis"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 authors = [ "Nelu Snegur <nelu@pulsarplanet.com>" ]
 keywords = [ "visualization", "ftdc", "mongodb" ]
@@ -17,7 +17,7 @@ include = [
 ]
 
 [dependencies]
-mprobe-diagnostics = { version = "0.1.1" }
+mprobe-diagnostics = { version = "0.2.0" }
 
 serde = { version = "1.0.160", features = [ "derive", "rc" ] }
 serde_json = "1.0.96"
